@@ -1,0 +1,148 @@
+---
+description: 
+globs: *.ts,*.vue
+alwaysApply: false
+---
+# TypeScript 开发规范
+
+## 1. 基础规范
+
+### 1.1 项目配置
+- 遵循项目 ESLint 配置
+- 启用严格模式（strict: true）
+- 使用 TypeScript 配置文件（tsconfig.json）
+- 确保类型安全
+
+### 1.2 类型定义
+- 优先使用 interface 而非 type
+- interface 命名以 I 开头
+- 类型定义放在文件顶部
+- 避免使用 any 类型
+
+## 2. 类型系统
+
+### 2.1 接口规范
+```typescript
+interface IUser {
+  // 只读属性
+  readonly id: number;
+  readonly createdAt: Date;
+  
+  // 必选属性
+  name: string;
+  age: number;
+  
+  // 可选属性
+  email?: string;
+  avatar?: string;
+  
+  // 索引签名（放在最后）
+  [key: string]: any;
+}
+```
+
+### 2.2 类型声明
+- 使用 TSDoc 注释
+- 明确函数参数类型
+- 明确返回值类型
+- 使用类型守卫
+
+### 2.3 泛型使用
+```typescript
+// 常见泛型命名
+T - Type（类型）
+K - Key（键）
+V - Value（值）
+E - Element（元素）
+R - Result（结果）
+P - Props（属性）
+
+// 示例
+function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
+  return obj[key];
+}
+```
+
+## 3. 最佳实践
+
+### 3.1 类型断言
+- 避免滥用类型断言
+- 优先使用类型守卫
+- TSX 中使用 as 断言
+- 使用类型收窄
+
+### 3.2 枚举使用
+- 避免使用 enum
+- 使用对象映射代替
+- 使用联合类型代替
+- 使用 const enum（如果必须）
+
+### 3.3 代码示例
+```typescript
+// 推荐：使用对象映射
+const UserRole = {
+  ADMIN: 'admin',
+  USER: 'user',
+  GUEST: 'guest'
+} as const;
+
+// 推荐：使用联合类型
+type UserRole = 'admin' | 'user' | 'guest';
+
+// 不推荐：使用枚举
+enum UserRole {
+  ADMIN = 'admin',
+  USER = 'user',
+  GUEST = 'guest'
+}
+```
+
+## 4. 文档规范
+
+### 4.1 TSDoc 注释
+```typescript
+/**
+ * 用户信息接口
+ * @interface IUser
+ */
+interface IUser {
+  /**
+   * 用户ID
+   * @type {number}
+   */
+  id: number;
+  
+  /**
+   * 获取用户信息
+   * @param {string} userId - 用户ID
+   * @returns {Promise<IUser>} 用户信息
+   */
+  getUserInfo(userId: string): Promise<IUser>;
+}
+```
+
+### 4.2 类型导出
+- 明确导出类型
+- 使用 type 导出
+- 避免导出 any
+- 提供类型说明
+
+## 5. 性能优化
+
+### 5.1 类型检查
+- 使用类型守卫
+- 避免类型断言
+- 使用类型收窄
+- 合理使用泛型
+
+### 5.2 编译优化
+- 使用 const 断言
+- 避免不必要的类型
+- 使用类型别名
+- 优化类型导入
+
+### 5.3 代码组织
+- 类型定义集中管理
+- 使用类型模块
+- 避免循环依赖
+- 保持类型简洁

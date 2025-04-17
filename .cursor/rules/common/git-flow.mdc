@@ -1,0 +1,54 @@
+---
+description:  git flow, 创建分支
+globs: 
+alwaysApply: false
+---
+# Github Flow 工作流规范
+
+## 分支说明
+- `master`: 主分支，用于生产环境部署
+- `feature/*`: 功能分支，用于开发新功能
+- `hotfix/*`: 热修复分支，用于修复生产环境的紧急问题
+
+## 分支命名规范
+- 功能分支: `feature/需求名称`
+  例如: `feature/创建天宫空间站`
+- 修复分支: `hotfix/问题描述-版本号`
+  例如: `hotfix/login-error-v1.2.3`
+
+## 工作流程
+
+### 1. 开发新功能
+1. 从 `master` 分支创建功能分支
+   ```bash
+   git checkout master
+   git pull origin master
+   git checkout -b feature/your-feature
+   ```
+2. 在功能分支上开发并提交代码, 提交信息参考 @git-message.mdc
+3. 完成开发后，将 `master` 分支合并到功能分支
+   ```bash
+   git checkout feature/your-feature
+   git pull origin master
+   ```
+4. 解决冲突（如果有）
+5.  提交 `Merge Request`, 参考 @git-merge-request.mdc
+
+### 2. 紧急修复
+1. 从 `master` 分支创建热修复分支
+   ```bash
+   git checkout master
+   git pull origin master
+   git checkout -b hotfix/bug-fix-v1.2.1
+   ```
+2. 在热修复分支上修复问题并提交代码, 提交信息参考 @git-message.mdc
+5.  提交 `Merge Request`, 参考 @git-merge-request.mdc
+
+## 提交规范
+- 提交前先拉取最新代码：`git pull`
+- 确保代码通过所有测试
+- 提交信息要清晰描述改动内容
+- 大功能开发要进行合理的拆分提交
+
+## 合并策略
+- 禁止直接在`master` 和 `develop` 分支上提交代码

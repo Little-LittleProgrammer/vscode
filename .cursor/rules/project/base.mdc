@@ -1,0 +1,123 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 项目
+
+## 目录结构
+
+## 项目结构
+这是一个单仓库
+```
+├─dist                        // 项目打包目录
+├─docs                        // 项目业务组件文档库
+│  ├─examples                // 项目业务组件示例
+│  ├─md                      // 项目业务组件对应期业务组件文档 
+│  ├─public                  // 项目业务公共模块
+│  ├─App.vue                 // 业务组件-布局界面
+│  └─ndex.js                // 业务组件主入口配置文件
+├─public                      // 主文件入口
+├─src                         // 源码目录
+│  ├─assets                   // 公共资源
+│  │  ├─fonts                 // 图标字体
+│  │  ├─images                // 图片资源
+│  │  ├─js                    // 公共方法
+│  │  │  ├─directives         // 指令
+│  │  │  ├─pwa                // pwa 缓存配置
+│  │  │  └─js-tools           // js 公共方法
+│  │  └─style                 // css样式
+│  ├─components               // 业务组件
+│  │  ├─global                // 注册的全局公共组件的位置
+│  │  │  ├─qm-search-form     // 表单配置
+│  │  │  ├─qm-confirm-dialog         // 弹窗确认=》this.$confirm 建议用组件展示
+│  │  │  ├─qm-dialog         // 弹窗
+│  │  │  ├─qm-el-sensitive-table   //基于 el-table 二次封装（新页面表格使用该组件）
+│  │  │  ├─qm-vxe-sensitive-table  //基于 vxe-table 二次封装（有大数据新页面表格使用该组件）
+│  │  │  ├─qm-linkage-select         // 包含数据联动的下拉框组件
+│  │  │  ├─qm-pagination         // /基于 el-pagination 二次封装（新页面分页使用该组件）
+│  │  │  ├─qm-remarks-textarea         // 多行文本输入框
+│  │  │  ├─qm-select         // 下拉
+│  │  │  ├─qm-tag        // 标记tag
+│  │  │  └─qm-tip-icon         // tip 提示
+│  │  ├─book-tag-picker       // 作品标签选择器组件
+│  │  ├─default-router-view   // router-view 组件
+│  │  ├─qm-aside              // 左侧菜单栏组件
+│  │  ├─qm-book-tag-possions  // 新作品标签组件（支持搜索-定位-高亮）
+│  │  ├─qm-breadcrumb-qimao   // 面包屑导航组件
+│  │  ├─qm-category-cascader  // 级联分类组件
+│  │  ├─qm-category-select    // 分类单个选择组件
+│  │  ├─qm-export-dialog      // 异步导出弹框组件
+│  │  ├─qm-header             // 头部导航栏组件
+│  │  ├─qm-highlight          // 高亮输入框组件
+│  │  ├─qm-no-data            // 无数据组件
+│  │  ├─qm-rotate-img         // 图片旋转组件
+│  │  ├─qm-scroll             // 超出滚动组件
+│  │  ├─qm-add-remake         // 添加备注组件
+│  │  ├─qm-add-works          // 添加作品id组件
+│  │  ├─qm-personalization-th-new // 自定义导出配置
+│  │  ├─qm-provincial-urban-areas // 省市区组件
+│  │  ├─qm-dept-adminid    // 部门编辑联动组件
+│  │  └─qm-todo-list          // 待办事项组件
+│  ├─http                     // axios请求封装
+│  │  ├─audit-center          // 审核中心
+│  │  ├─author              // 作者中心
+│  │  ├─channel             // 渠道管理模块
+│  │  ├─content-center      // 内容中心接口地址，其余模块类似
+│  │  ├─data-center             // 数据中心接口地址
+│  │  ├─finance               // 结算中心接口地址，其余模块类似
+│  │  │  └─naodong            // 按站点或者业务类划分的接口地址（如qimao、miao、naodong、zongheng、revenue-recognition）其余模块类似
+│  │  ├─operation               // 运营后台接口地址，其余模块类似
+│  │  ├─api                   // php接口地址
+│  │  ├─api-go                  // go接口地址
+│  │  ├─index                 // axios封装
+│  │  └─new_request            // 新 axios封装（基于go服务 ）
+│  ├─layout                  // 布局
+│  │  ├─components           // 布局-组件入口
+│  │  │ ├─qm-aside          // 左侧
+│  │  │ ├─qm-header          // 头
+│  │  │ ├─qm-menu-tree          // 菜单
+│  │  │ ├─scoll-pane         // 滑动
+│  │  │ ├─tags-view          //多页签窗口菜单
+│  │  │ ├─user-info         // 用户信息-待办
+│  │  └─index.vue            // 展示入口
+│  ├─mixin                  // 混入(mixin)
+│  │  ├─keyword-change-chapter  // 键盘事件
+│  │  └─table-pos          //表格-记住当前表格滚动位置
+│  ├─plugins                  // 插件
+│  │  ├─element-ui            // element-ui 懒加载配置
+│  │  ├─vxe            // vxe-表格  懒加载配置
+│  │  ├─registerServiceWorker    //pwa 相关配置
+│  │  └─filters               // 全局过滤器
+│  ├─router                   // vue-router路由管理
+│  │  ├─modules              // 路由分类管理目录
+│  │  └─index                 // 路由主入口文件
+│  ├─store                    // vuex状态管理
+│  ├─views                    // 渲染的页面
+│  │  ├─audit-centre          // 审核中心
+│  │  ├─authority             // 系统管理
+│  │  ├─book-author           // 作者管理
+│  │  ├─channel-manage        // 渠道管理
+│  │  ├─finance               // 财务管理
+│  │  ├─help-center           // 帮助中心
+│  │  ├─indicators            // 业务指标
+│  │  ├─operation             // 运营管理
+│  │  ├─recommend             // 推荐管理
+│  │  ├─works                 // 作品管理
+│  │  └─works-data            // 作品数据
+│  └─main.js                // 项目的入口文件
+├─vue.config.js               // vue项目配置文件
+├─babel.config.js             // babel配置目录
+├─.eslintrc                   // eslint配置文件
+├─.npmrc                      // npm配置文件
+├─.env                        // 环境配置文件
+├─.env.development            // 环境配置文件
+├─.env.production             // 环境配置文件
+├─.env.staging                // 环境配置文件
+├─ package.json               // 项目引入资源配置文件
+└─ package-lock.json          // 资源锁定版本配置文件
+```
+
+## 技术栈
+
+`element-ui@2` + `vue-cli@4` + `vue@2.6` + `js`
