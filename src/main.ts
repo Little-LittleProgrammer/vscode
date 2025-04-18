@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *  版权所有 (c) Microsoft Corporation。保留所有权利。
+ *  根据 MIT 许可证授权。详见项目根目录下的 License.txt 文件。
  *--------------------------------------------------------------------------------------------*/
 
 import * as path from 'path';
@@ -26,76 +26,73 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 perf.mark('code/didStartMain');
 
 perf.mark('code/willLoadMainBundle', {
-	// When built, the main bundle is a single JS file with all
-	// dependencies inlined. As such, we mark `willLoadMainBundle`
-	// as the start of the main bundle loading process.
+	// 构建时，主包是一个包含所有内联依赖的单一 JS 文件。
+	// 因此，我们将 `willLoadMainBundle` 标记为主包加载过程的开始。
 	startTime: Math.floor(performance.timeOrigin)
 });
 perf.mark('code/didLoadMainBundle');
 
-// Enable portable support
+// 启用便携模式支持
 const portable = configurePortable(product);
 
 const args = parseCLIArgs();
-// Configure static command line arguments
+// 配置静态命令行参数
 const argvConfig = configureCommandlineSwitchesSync(args);
-// Enable sandbox globally unless
-// 1) disabled via command line using either
-//    `--no-sandbox` or `--disable-chromium-sandbox` argument.
-// 2) argv.json contains `disable-chromium-sandbox: true`.
+// 全局启用沙箱，除非
+// 1) 通过命令行使用 `--no-sandbox` 或 `--disable-chromium-sandbox` 参数禁用。
+// 2) argv.json 包含 `disable-chromium-sandbox: true`。
 if (args['sandbox'] &&
 	!args['disable-chromium-sandbox'] &&
 	!argvConfig['disable-chromium-sandbox']) {
 	app.enableSandbox();
 } else if (app.commandLine.hasSwitch('no-sandbox') &&
 	!app.commandLine.hasSwitch('disable-gpu-sandbox')) {
-	// Disable GPU sandbox whenever --no-sandbox is used.
+	// 当使用 --no-sandbox 时，禁用 GPU 沙箱。
 	app.commandLine.appendSwitch('disable-gpu-sandbox');
 } else {
 	app.commandLine.appendSwitch('no-sandbox');
 	app.commandLine.appendSwitch('disable-gpu-sandbox');
 }
 
-// Set userData path before app 'ready' event
+// 在 app 'ready' 事件之前设置 userData 路径
 const userDataPath = getUserDataPath(args, product.nameShort ?? 'code-oss-dev');
 if (process.platform === 'win32') {
 	const userDataUNCHost = getUNCHost(userDataPath);
 	if (userDataUNCHost) {
-		addUNCHostToAllowlist(userDataUNCHost); // enables to use UNC paths in userDataPath
+		addUNCHostToAllowlist(userDataUNCHost); // 允许在 userDataPath 中使用 UNC 路径
 	}
 }
 app.setPath('userData', userDataPath);
 
-// Resolve code cache path
+// 解析代码缓存路径
 const codeCachePath = getCodeCachePath();
 
-// Disable default menu (https://github.com/electron/electron/issues/35512)
+// 禁用默认菜单 (https://github.com/electron/electron/issues/35512)
 Menu.setApplicationMenu(null);
 
-// Configure crash reporter
+// 配置崩溃报告器
 perf.mark('code/willStartCrashReporter');
-// If a crash-reporter-directory is specified we store the crash reports
-// in the specified directory and don't upload them to the crash server.
+// 如果指定了 crash-reporter-directory，我们将崩溃报告存储在指定目录中，
+// 并且不将它们上传到崩溃服务器。
 //
-// Appcenter crash reporting is enabled if
-// * enable-crash-reporter runtime argument is set to 'true'
-// * --disable-crash-reporter command line parameter is not set
+// 如果满足以下条件，则启用 Appcenter 崩溃报告：
+// * 运行时参数 enable-crash-reporter 设置为 'true'
+// * 未设置 --disable-crash-reporter 命令行参数
 //
-// Disable crash reporting in all other cases.
+// 在所有其他情况下禁用崩溃报告。
 if (args['crash-reporter-directory'] || (argvConfig['enable-crash-reporter'] && !args['disable-crash-reporter'])) {
 	configureCrashReporter();
 }
 perf.mark('code/didStartCrashReporter');
 
-// Set logs path before app 'ready' event if running portable
-// to ensure that no 'logs' folder is created on disk at a
-// location outside of the portable directory
+// 如果以便携模式运行，在 app 'ready' 事件之前设置日志路径，
+// 以确保不会在便携目录之外的位置创建 'logs' 文件夹
 // (https://github.com/microsoft/vscode/issues/56651)
 if (portable && portable.isPortable) {
 	app.setAppLogsPath(path.join(userDataPath, 'logs'));
 }
 
-// Register custom schemes with privileges
+// 注册具有权限的自定义协议
 protocol.registerSchemesAsPrivileged([
 	{
 		scheme: 'vscode-webview',
@@ -107,20 +104,18 @@ protocol.registerSchemesAsPrivileged([
 	}
 ]);
 
-// Global app listeners
+// 全局应用监听器
 registerListeners();
 
 /**
- * We can resolve the NLS configuration early if it is defined
- * in argv.json before `app.ready` event. Otherwise we can only
- * resolve NLS after `app.ready` event to resolve the OS locale.
+ * 如果 NLS 配置在 argv.json 中定义了，我们可以在 `app.ready` 事件之前提前解析它。
+ * 否则，我们只能在 `app.ready` 事件之后解析 NLS，以便解析操作系统区域设置。
  */
 let nlsConfigurationPromise: Promise<INLSConfiguration> | undefined = undefined;
 
-// Use the most preferred OS language for language recommendation.
-// The API might return an empty array on Linux, such as when
-// the 'C' locale is the user's only configured locale.
-// No matter the OS, if the array is empty, default back to 'en'.
+// 使用最优选的操作系统语言进行语言推荐。
+// 在 Linux 上，该 API 可能返回一个空数组，例如当 'C' 区域设置是用户唯一配置的区域设置时。
+// 无论操作系统如何，如果数组为空，则默认回退到 'en'。
 const osLocale = processZhLocale((app.getPreferredSystemLanguages()?.[0] ?? 'en').toLowerCase());
 const userLocale = getUserDefinedLocale(argvConfig);
 if (userLocale) {
@@ -133,20 +128,20 @@ if (userLocale) {
 	});
 }
 
-// Pass in the locale to Electron so that the
-// Windows Control Overlay is rendered correctly on Windows.
-// For now, don't pass in the locale on macOS due to
-// https://github.com/microsoft/vscode/issues/167543.
-// If the locale is `qps-ploc`, the Microsoft
-// Pseudo Language Language Pack is being used.
-// In that case, use `en` as the Electron locale.
+// 将区域设置传递给 Electron，以便在 Windows 上正确渲染
+// Windows Control Overlay。
+// 目前，由于 https://github.com/microsoft/vscode/issues/167543，
+// 不在 macOS 上传递区域设置。
+// 如果区域设置是 `qps-ploc`，则表示正在使用 Microsoft
+// Pseudo Language Language Pack。
+// 在这种情况下，使用 `en` 作为 Electron 的区域设置。
 
 if (process.platform === 'win32' || process.platform === 'linux') {
 	const electronLocale = (!userLocale || userLocale === 'qps-ploc') ? 'en' : userLocale;
-	app.commandLine.appendSwitch('lang', electronLocale);
+	app.commandLine.appendSwitch('lang	', electronLocale);
 }
 
-// Load our code once ready
+// 在准备就绪后加载我们的代码
 app.once('ready', function () {
 	if (args['trace']) {
 		let traceOptions: Electron.TraceConfig | Electron.TraceCategoriesAndOptions;
@@ -201,16 +196,16 @@ async function onReady() {
 }
 
 /**
- * Main startup routine
+ * 主启动例程
  */
 async function startup(codeCachePath: string | undefined, nlsConfig: INLSConfiguration): Promise<void> {
 	process.env['VSCODE_NLS_CONFIG'] = JSON.stringify(nlsConfig);
 	process.env['VSCODE_CODE_CACHE_PATH'] = codeCachePath || '';
 
-	// Bootstrap ESM
+	// 引导 ESM
 	await bootstrapESM();
 
-	// Load Main
+	// 加载 Main
 	await import('./vs/code/electron-main/main.js');
 	perf.mark('code/didRunMainBundle');
 }
@@ -218,58 +213,58 @@ async function startup(codeCachePath: string | undefined, nlsConfig: INLSConfigu
 function configureCommandlineSwitchesSync(cliArgs: NativeParsedArgs) {
 	const SUPPORTED_ELECTRON_SWITCHES = [
 
-		// alias from us for --disable-gpu
+		// 我们为 --disable-gpu 设置的别名
 		'disable-hardware-acceleration',
 
-		// override for the color profile to use
+		// 覆盖要使用的颜色配置文件
 		'force-color-profile',
 
-		// disable LCD font rendering, a Chromium flag
+		// 禁用 LCD 字体渲染，一个 Chromium 标志
 		'disable-lcd-text',
 
-		// bypass any specified proxy for the given semi-colon-separated list of hosts
+		// 对给定的分号分隔的主机列表绕过任何指定的代理
 		'proxy-bypass-list'
 	];
 
 	if (process.platform === 'linux') {
 
-		// Force enable screen readers on Linux via this flag
+		// 通过此标志在 Linux 上强制启用屏幕阅读器
 		SUPPORTED_ELECTRON_SWITCHES.push('force-renderer-accessibility');
 
-		// override which password-store is used on Linux
+		// 覆盖在 Linux 上使用的密码存储
 		SUPPORTED_ELECTRON_SWITCHES.push('password-store');
 	}
 
 	const SUPPORTED_MAIN_PROCESS_SWITCHES = [
 
-		// Persistently enable proposed api via argv.json: https://github.com/microsoft/vscode/issues/99775
+		// 通过 argv.json 持久启用 proposed api: https://github.com/microsoft/vscode/issues/99775
 		'enable-proposed-api',
 
-		// Log level to use. Default is 'info'. Allowed values are 'error', 'warn', 'info', 'debug', 'trace', 'off'.
+		// 要使用的日志级别。默认为 'info'。允许的值为 'error', 'warn', 'info', 'debug', 'trace', 'off'。
 		'log-level',
 
-		// Use an in-memory storage for secrets
+		// 对机密使用内存存储
 		'use-inmemory-secretstorage'
 	];
 
-	// Read argv config
+	// 读取 argv 配置
 	const argvConfig = readArgvConfigSync();
 
 	Object.keys(argvConfig).forEach(argvKey => {
 		const argvValue = argvConfig[argvKey];
 
-		// Append Electron flags to Electron
+		// 将 Electron 标志附加到 Electron
 		if (SUPPORTED_ELECTRON_SWITCHES.indexOf(argvKey) !== -1) {
 			if (argvValue === true || argvValue === 'true') {
 				if (argvKey === 'disable-hardware-acceleration') {
-					app.disableHardwareAcceleration(); // needs to be called explicitly
+					app.disableHardwareAcceleration(); // 需要显式调用
 				} else {
 					app.commandLine.appendSwitch(argvKey);
 				}
 			} else if (typeof argvValue === 'string' && argvValue) {
 				if (argvKey === 'password-store') {
-					// Password store
-					// TODO@TylerLeonhardt: Remove this migration in 3 months
+					// 密码存储
+					// TODO@TylerLeonhardt: 3个月后移除此迁移
 					let migratedArgvValue = argvValue;
 					if (argvValue === 'gnome' || argvValue === 'gnome-keyring') {
 						migratedArgvValue = 'gnome-libsecret';
@@ -281,14 +276,14 @@ function configureCommandlineSwitchesSync(cliArgs: NativeParsedArgs) {
 			}
 		}
 
-		// Append main process flags to process.argv
+		// 将主进程标志附加到 process.argv
 		else if (SUPPORTED_MAIN_PROCESS_SWITCHES.indexOf(argvKey) !== -1) {
 			switch (argvKey) {
 				case 'enable-proposed-api':
 					if (Array.isArray(argvValue)) {
 						argvValue.forEach(id => id && typeof id === 'string' && process.argv.push('--enable-proposed-api', id));
 					} else {
-						console.error(`Unexpected value for \`enable-proposed-api\` in argv.json. Expected array of extension ids.`);
+						console.error(`argv.json 中 \`enable-proposed-api\` 的值无效。预期为扩展 ID 数组。`);
 					}
 					break;
 
@@ -311,36 +306,36 @@ function configureCommandlineSwitchesSync(cliArgs: NativeParsedArgs) {
 		}
 	});
 
-	// Following features are enabled from the runtime:
+	// 从运行时启用以下功能：
 	// `DocumentPolicyIncludeJSCallStacksInCrashReports` - https://www.electronjs.org/docs/latest/api/web-frame-main#framecollectjavascriptcallstack-experimental
-	// `EarlyEstablishGpuChannel` - Refs https://issues.chromium.org/issues/40208065
-	// `EstablishGpuChannelAsync` - Refs https://issues.chromium.org/issues/40208065
+	// `EarlyEstablishGpuChannel` - 参考 https://issues.chromium.org/issues/40208065
+	// `EstablishGpuChannelAsync` - 参考 https://issues.chromium.org/issues/40208065
 	const featuresToEnable =
 		`DocumentPolicyIncludeJSCallStacksInCrashReports,EarlyEstablishGpuChannel,EstablishGpuChannelAsync,${app.commandLine.getSwitchValue('enable-features')}`;
 	app.commandLine.appendSwitch('enable-features', featuresToEnable);
 
-	// Following features are disabled from the runtime:
-	// `CalculateNativeWinOcclusion` - Disable native window occlusion tracker (https://groups.google.com/a/chromium.org/g/embedder-dev/c/ZF3uHHyWLKw/m/VDN2hDXMAAAJ)
+	// 从运行时禁用以下功能：
+	// `CalculateNativeWinOcclusion` - 禁用原生窗口遮挡跟踪器 (https://groups.google.com/a/chromium.org/g/embedder-dev/c/ZF3uHHyWLKw/m/VDN2hDXMAAAJ)
 	const featuresToDisable =
 		`CalculateNativeWinOcclusion,${app.commandLine.getSwitchValue('disable-features')}`;
 	app.commandLine.appendSwitch('disable-features', featuresToDisable);
 
-	// Blink features to configure.
-	// `FontMatchingCTMigration` - Siwtch font matching on macOS to Appkit (Refs https://github.com/microsoft/vscode/issues/224496#issuecomment-2270418470).
-	// `StandardizedBrowserZoom` - Disable zoom adjustment for bounding box (https://github.com/microsoft/vscode/issues/232750#issuecomment-2459495394)
+	// Blink 功能配置。
+	// `FontMatchingCTMigration` - 将 macOS 上的字体匹配切换到 Appkit (参考 https://github.com/microsoft/vscode/issues/224496#issuecomment-2270418470)。
+	// `StandardizedBrowserZoom` - 禁用边界框的缩放调整 (https://github.com/microsoft/vscode/issues/232750#issuecomment-2459495394)
 	const blinkFeaturesToDisable =
 		`FontMatchingCTMigration,StandardizedBrowserZoom,${app.commandLine.getSwitchValue('disable-blink-features')}`;
 	app.commandLine.appendSwitch('disable-blink-features', blinkFeaturesToDisable);
 
-	// Support JS Flags
+	// 支持 JS 标志
 	const jsFlags = getJSFlags(cliArgs);
 	if (jsFlags) {
 		app.commandLine.appendSwitch('js-flags', jsFlags);
 	}
 
-	// Use portal version 4 that supports current_folder option
-	// to address https://github.com/microsoft/vscode/issues/213780
-	// Runtime sets the default version to 3, refs https://github.com/electron/electron/pull/44426
+	// 使用支持 current_folder 选项的 portal 版本 4
+	// 来解决 https://github.com/microsoft/vscode/issues/213780
+	// 运行时将默认版本设置为 3，参考 https://github.com/electron/electron/pull/44426
 	app.commandLine.appendSwitch('xdg-portal-required-version', '4');
 
 	return argvConfig;
@@ -363,7 +358,7 @@ interface IArgvConfig {
 
 function readArgvConfigSync(): IArgvConfig {
 
-	// Read or create the argv.json config file sync before app('ready')
+	// 在 app('ready') 之前同步读取或创建 argv.json 配置文件
 	const argvConfigPath = getArgvConfigPath();
 	let argvConfig: IArgvConfig | undefined = undefined;
 	try {
@@ -372,11 +367,11 @@ function readArgvConfigSync(): IArgvConfig {
 		if (error && error.code === 'ENOENT') {
 			createDefaultArgvConfigSync(argvConfigPath);
 		} else {
-			console.warn(`Unable to read argv.json configuration file in ${argvConfigPath}, falling back to defaults (${error})`);
+			console.warn(`无法读取 ${argvConfigPath} 中的 argv.json 配置文件，将回退到默认设置 (${error})`);
 		}
 	}
 
-	// Fallback to default
+	// 回退到默认设置
 	if (!argvConfig) {
 		argvConfig = {};
 	}
@@ -387,32 +382,31 @@ function readArgvConfigSync(): IArgvConfig {
 function createDefaultArgvConfigSync(argvConfigPath: string): void {
 	try {
 
-		// Ensure argv config parent exists
+		// 确保 argv 配置父目录存在
 		const argvConfigPathDirname = path.dirname(argvConfigPath);
 		if (!fs.existsSync(argvConfigPathDirname)) {
 			fs.mkdirSync(argvConfigPathDirname);
 		}
 
-		// Default argv content
+		// 默认 argv 内容
 		const defaultArgvConfigContent = [
-			'// This configuration file allows you to pass permanent command line arguments to VS Code.',
-			'// Only a subset of arguments is currently supported to reduce the likelihood of breaking',
-			'// the installation.',
+			'// 此配置文件允许您向 VS Code 传递永久命令行参数。',
+			'// 目前仅支持部分参数，以减少破坏安装的可能性。',
 			'//',
-			'// PLEASE DO NOT CHANGE WITHOUT UNDERSTANDING THE IMPACT',
+			'// 请在了解影响后再进行更改',
 			'//',
-			'// NOTE: Changing this file requires a restart of VS Code.',
+			'// 注意：更改此文件需要重新启动 VS Code。',
 			'{',
-			'	// Use software rendering instead of hardware accelerated rendering.',
-			'	// This can help in cases where you see rendering issues in VS Code.',
+			'	// 使用软件渲染而不是硬件加速渲染。',
+			'	// 这在 VS Code 中遇到渲染问题时可能会有所帮助。',
 			'	// "disable-hardware-acceleration": true',
 			'}'
 		];
 
-		// Create initial argv.json with default content
+		// 使用默认内容创建初始 argv.json
 		fs.writeFileSync(argvConfigPath, defaultArgvConfigContent.join('\n'));
 	} catch (error) {
-		console.error(`Unable to create argv.json configuration file in ${argvConfigPath}, falling back to defaults (${error})`);
+		console.error(`无法在 ${argvConfigPath} 中创建 argv.json 配置文件，将回退到默认设置 (${error})`);
 	}
 }
 
@@ -437,7 +431,7 @@ function configureCrashReporter(): void {
 		crashReporterDirectory = path.normalize(crashReporterDirectory);
 
 		if (!path.isAbsolute(crashReporterDirectory)) {
-			console.error(`The path '${crashReporterDirectory}' specified for --crash-reporter-directory must be absolute.`);
+			console.error(`为 --crash-reporter-directory 指定的路径 '${crashReporterDirectory}' 必须是绝对路径。`);
 			app.exit(1);
 		}
 
@@ -445,18 +439,18 @@ function configureCrashReporter(): void {
 			try {
 				fs.mkdirSync(crashReporterDirectory, { recursive: true });
 			} catch (error) {
-				console.error(`The path '${crashReporterDirectory}' specified for --crash-reporter-directory does not seem to exist or cannot be created.`);
+				console.error(`为 --crash-reporter-directory 指定的路径 '${crashReporterDirectory}' 似乎不存在或无法创建。`);
 				app.exit(1);
 			}
 		}
 
-		// Crashes are stored in the crashDumps directory by default, so we
-		// need to change that directory to the provided one
-		console.log(`Found --crash-reporter-directory argument. Setting crashDumps directory to be '${crashReporterDirectory}'`);
+		// 默认情况下，崩溃存储在 crashDumps 目录中，因此我们
+		// 需要将该目录更改为提供的目录
+		console.log(`找到 --crash-reporter-directory 参数。将 crashDumps 目录设置为 '${crashReporterDirectory}'`);
 		app.setPath('crashDumps', crashReporterDirectory);
 	}
 
-	// Otherwise we configure the crash reporter from product.json
+	// 否则我们从 product.json 配置崩溃报告器
 	else {
 		const appCenter = product.appCenter;
 		if (appCenter) {
@@ -492,23 +486,23 @@ function configureCrashReporter(): void {
 					submitURL = appCenter['linux-x64'];
 				}
 				submitURL = submitURL.concat('&uid=', crashReporterId, '&iid=', crashReporterId, '&sid=', crashReporterId);
-				// Send the id for child node process that are explicitly starting crash reporter.
-				// For vscode this is ExtensionHost process currently.
+				// 发送显式启动崩溃报告器的子节点进程的 ID。
+				// 对于 vscode，目前是 ExtensionHost 进程。
 				const argv = process.argv;
 				const endOfArgsMarkerIndex = argv.indexOf('--');
 				if (endOfArgsMarkerIndex === -1) {
 					argv.push('--crash-reporter-id', crashReporterId);
 				} else {
-					// if the we have an argument "--" (end of argument marker)
-					// we cannot add arguments at the end. rather, we add
-					// arguments before the "--" marker.
+					// 如果我们有一个参数 "--"（参数结束标记）
+					// 我们不能在末尾添加参数。相反，我们在
+					// "--" 标记之前添加参数。
 					argv.splice(endOfArgsMarkerIndex, 0, '--crash-reporter-id', crashReporterId);
 				}
 			}
 		}
 	}
 
-	// Start crash reporter for all processes
+	// 为所有进程启动崩溃报告器
 	const productName = (product.crashReporter ? product.crashReporter.productName : undefined) || product.nameShort;
 	const companyName = (product.crashReporter ? product.crashReporter.companyName : undefined) || 'Microsoft';
 	const uploadToServer = Boolean(!process.env['VSCODE_DEV'] && submitURL && !crashReporterDirectory);
@@ -524,20 +518,20 @@ function configureCrashReporter(): void {
 function getJSFlags(cliArgs: NativeParsedArgs): string | null {
 	const jsFlags: string[] = [];
 
-	// Add any existing JS flags we already got from the command line
+	// 添加我们已经从命令行获取的任何现有 JS 标志
 	if (cliArgs['js-flags']) {
 		jsFlags.push(cliArgs['js-flags']);
 	}
 
 	if (process.platform === 'linux') {
-		// Fix cppgc crash on Linux with 16KB page size.
-		// Refs https://issues.chromium.org/issues/378017037
-		// The fix from https://github.com/electron/electron/commit/6c5b2ef55e08dc0bede02384747549c1eadac0eb
-		// only affects non-renderer process.
-		// The following will ensure that the flag will be
-		// applied to the renderer process as well.
-		// TODO(deepak1556): Remove this once we update to
-		// Chromium >= 134.
+		// 修复 Linux 上 16KB 页面大小的 cppgc 崩溃。
+		// 参考 https://issues.chromium.org/issues/378017037
+		// 来自 https://github.com/electron/electron/commit/6c5b2ef55e08dc0bede02384747549c1eadac0eb 的修复
+		// 只影响非渲染器进程。
+		// 以下将确保该标志也将应用于
+		// 渲染器进程。
+		// TODO(deepak1556): 一旦我们更新到
+		// Chromium >= 134，就移除此项。
 		jsFlags.push('--nodecommit_pooled_pages');
 	}
 
@@ -567,8 +561,8 @@ function parseCLIArgs(): NativeParsedArgs {
 function registerListeners(): void {
 
 	/**
-	 * macOS: when someone drops a file to the not-yet running VSCode, the open-file event fires even before
-	 * the app-ready event. We listen very early for open-file and remember this upon startup as path to open.
+	 * macOS: 当有人将文件拖放到尚未运行的 VSCode 时，open-file 事件甚至在
+	 * app-ready 事件之前触发。我们很早就监听 open-file 并将其记作启动时要打开的路径。
 	 */
 	const macOpenFiles: string[] = [];
 	(globalThis as any)['macOpenFiles'] = macOpenFiles;
@@ -577,7 +571,7 @@ function registerListeners(): void {
 	});
 
 	/**
-	 * macOS: react to open-url requests.
+	 * macOS: 响应 open-url 请求。
 	 */
 	const openUrls: string[] = [];
 	const onOpenUrl =
@@ -600,17 +594,17 @@ function registerListeners(): void {
 
 function getCodeCachePath(): string | undefined {
 
-	// explicitly disabled via CLI args
+	// 通过 CLI 参数显式禁用
 	if (process.argv.indexOf('--no-cached-data') > 0) {
 		return undefined;
 	}
 
-	// running out of sources
+	// 从源代码运行
 	if (process.env['VSCODE_DEV']) {
 		return undefined;
 	}
 
-	// require commit id
+	// 需要 commit id
 	const commit = product.commit;
 	if (!commit) {
 		return undefined;
@@ -626,28 +620,27 @@ async function mkdirpIgnoreError(dir: string | undefined): Promise<string | unde
 
 			return dir;
 		} catch (error) {
-			// ignore
+			// 忽略
 		}
 	}
 
 	return undefined;
 }
 
-//#region NLS Support
+//#region NLS 支持
 
 function processZhLocale(appLocale: string): string {
 	if (appLocale.startsWith('zh')) {
 		const region = appLocale.split('-')[1];
 
-		// On Windows and macOS, Chinese languages returned by
-		// app.getPreferredSystemLanguages() start with zh-hans
-		// for Simplified Chinese or zh-hant for Traditional Chinese,
-		// so we can easily determine whether to use Simplified or Traditional.
-		// However, on Linux, Chinese languages returned by that same API
-		// are of the form zh-XY, where XY is a country code.
-		// For China (CN), Singapore (SG), and Malaysia (MY)
-		// country codes, assume they use Simplified Chinese.
-		// For other cases, assume they use Traditional.
+		// 在 Windows 和 macOS 上，由 app.getPreferredSystemLanguages() 返回的中文语言
+		// 以 zh-hans（简体中文）或 zh-hant（繁体中文）开头，
+		// 因此我们可以轻松确定是使用简体还是繁体。
+		// 然而，在 Linux 上，由同一 API 返回的中文语言
+		// 的格式为 zh-XY，其中 XY 是国家/地区代码。
+		// 对于中国 (CN)、新加坡 (SG) 和马来西亚 (MY)
+		// 的国家/地区代码，假定它们使用简体中文。
+		// 对于其他情况，假定它们使用繁体中文。
 		if (['hans', 'cn', 'sg', 'my'].includes(region)) {
 			return 'zh-cn';
 		}
@@ -659,21 +652,21 @@ function processZhLocale(appLocale: string): string {
 }
 
 /**
- * Resolve the NLS configuration
+ * 解析 NLS 配置
  */
 async function resolveNlsConfiguration(): Promise<INLSConfiguration> {
 
-	// First, we need to test a user defined locale.
-	// If it fails we try the app locale.
-	// If that fails we fall back to English.
+	// 首先，我们需要测试用户定义的区域设置。
+	// 如果失败，我们尝试应用程序区域设置。
+	// 如果还是失败，我们回退到英语。
 
 	const nlsConfiguration = nlsConfigurationPromise ? await nlsConfigurationPromise : undefined;
 	if (nlsConfiguration) {
 		return nlsConfiguration;
 	}
 
-	// Try to use the app locale which is only valid
-	// after the app ready event has been fired.
+	// 尝试使用应用程序区域设置，这仅在
+	// app ready 事件触发后有效。
 
 	let userLocale = app.getLocale();
 	if (!userLocale) {
@@ -683,13 +676,13 @@ async function resolveNlsConfiguration(): Promise<INLSConfiguration> {
 			resolvedLanguage: 'en',
 			defaultMessagesFile: path.join(__dirname, 'nls.messages.json'),
 
-			// NLS: below 2 are a relic from old times only used by vscode-nls and deprecated
+			// NLS: 下面 2 项是旧时代的遗留物，仅由 vscode-nls 使用并已弃用
 			locale: 'en',
 			availableLanguages: {}
 		};
 	}
 
-	// See above the comment about the loader and case sensitiveness
+	// 请参阅上面关于加载器和大小写敏感性的注释
 	userLocale = processZhLocale(userLocale.toLowerCase());
 
 	return resolveNLSConfiguration({
@@ -702,15 +695,14 @@ async function resolveNlsConfiguration(): Promise<INLSConfiguration> {
 }
 
 /**
- * Language tags are case insensitive however an ESM loader is case sensitive
- * To make this work on case preserving & insensitive FS we do the following:
- * the language bundles have lower case language tags and we always lower case
- * the locale we receive from the user or OS.
+ * 语言标签不区分大小写，但是 ESM 加载器区分大小写
+ * 为了使其在保留大小写和不区分大小写的 FS 上工作，我们执行以下操作：
+ * 语言包具有小写语言标签，我们始终将从用户或 OS 收到的区域设置转换为小写。
  */
 function getUserDefinedLocale(argvConfig: IArgvConfig): string | undefined {
 	const locale = args['locale'];
 	if (locale) {
-		return locale.toLowerCase(); // a directly provided --locale always wins
+		return locale.toLowerCase(); // 直接提供的 --locale 总是优先
 	}
 
 	return typeof argvConfig?.locale === 'string' ? argvConfig.locale.toLowerCase() : undefined;

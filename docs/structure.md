@@ -1,5 +1,86 @@
 # 项目目录结构说明
 
+## VS Code 项目目录结构 (树状视图)
+
+```
+├── .git/                      # Git 版本控制系统目录
+├── .github/                   # GitHub 相关配置 (Workflows, Issue Templates)
+├── .vscode/                   # VS Code 编辑器特定配置 (launch.json, settings.json)
+├── .devcontainer/             # 开发容器配置 (Remote Containers, Codespaces)
+├── build/                     # 构建脚本和相关工具 (Gulp Tasks)
+├── cli/                       # 命令行接口 (CLI) 源代码
+├── docs/                      # 项目文档 (包括此文件)
+├── extensions/                # VS Code 内置扩展源代码
+├── node_modules/              # Node.js 依赖包 (由 npm install 生成)
+├── out/                       # 编译后的 JavaScript 输出目录 (运行时的代码)
+├── remote/                    # 远程开发相关代码
+├── resources/                 # 应用程序资源文件 (图标, 平台特定文件)
+├── scripts/                   # 辅助脚本 (启动, 测试等)
+├── src/                       # TypeScript 核心源代码目录
+│   ├── vs/                    # VS Code 核心实现
+│   │   ├── base/              # 基础工具库和通用服务 (与平台无关)
+│   │   │   ├── browser/       # 浏览器环境特有的基础实现 (DOM 操作等)
+│   │   │   ├── common/        # 通用基础代码 (事件, 生命周期, URI, 异步, diff, markdown解析, worker协议, 工具函数等)
+│   │   │   ├── node/          # Node.js 环境特有的基础实现 (文件系统, 进程通信等)
+│   │   │   ├── parts/         # 核心组件 (IPC协议, quickopen, tree组件等)
+│   │   │   └── test/          # `base` 模块的单元测试用例
+│   │   │   └── worker/        # Worker factory 和 main Worker 实现
+│   │   ├── code/              # VS Code 扩展 API 的实现和管理
+│   │   │   ├── browser/       # 浏览器环境下的扩展 API 实现
+│   │   │   ├── electron-sandbox/ #渲染进程api, 可以调用common, brower, node, 依赖electron renderer-process API
+│   │   │   ├── electron-main/ # 主进程api, 可以调用: common, node 依赖于electron main-process AP
+│   │   │   └── node/          # Node.js 环境下的扩展 API 实现（如文件系统访问、进程管理等）
+
+│   │   ├── editor/            # 编辑器核心实现 (Monaco Editor 基础)
+│   │   │   ├── browser/       # 编辑器在浏览器环境下的 UI 实现和交互
+│   │   │   ├── common/        # 编辑器通用模型、接口和逻辑 (文本模型, 视图模型, 语言特性, 命令, 配置)
+│   │   │   ├── contrib/       # 编辑器附加功能 (查找, 替换, 片段, 括号匹配, 建议等)
+│   │   │   └── standalone/    # Monaco Editor 作为独立编辑器使用的特有代码
+│   │   ├── platform/          # 平台抽象层 (服务接口定义和跨环境实现)
+│   │   ├── server/            # VS Code 服务器端实现 (远程开发, Web 版本)
+│   │   │   ├── node/          # Node.js 环境下的服务器实现
+│   │   │   ├── browser/       # 浏览器环境下的服务器连接逻辑
+│   │   │   └── common/        # 服务器端通用代码和接口
+│   │   └── workbench/         # 工作台 UI 和核心服务实现
+│   │       ├── api/           # 暴露给扩展的 API 的具体实现
+│   │       ├── browser/       # 工作台在浏览器环境下的 UI 实现 (视图, 状态栏, 活动栏等)
+│   │       ├── common/        # 工作台通用的模型、接口和逻辑
+│   │       ├── contrib/       # 工作台附加功能 (调试, 终端, 搜索, SCM, 扩展管理 UI 等)
+│   │       ├── electron-sandbox/ # Electron 沙盒环境特定实现
+│   │       ├── electron-main/ # Electron 主进程环境特定实现
+│   │       └── services/      # 工作台核心服务的实现 (依赖 platform)
+│   ├── vscode-dts/            # VS Code 扩展 API 的 TypeScript 定义文件
+│   │   ├── vscode.d.ts        # 稳定的 API 定义
+│   │   └── vscode.proposed.*.d.ts # 提案阶段 (不稳定) 的 API 定义
+│   ├── typings/               # 项目内部使用的或第三方的 TypeScript 类型定义
+│   ├── bootstrap-*.ts         # 不同环境的启动脚本·
+│   ├── main.ts                # Electron 主进程入口点
+│   ├── cli.ts                 # 命令行接口 (CLI) 入口点
+│   ├── server-main.ts         # VS Code Server 主入口点
+│   ├── server-cli.ts          # VS Code Server CLI 入口点
+│   ├── tsconfig.*.json        # TypeScript 编译配置文件
+│   └── tsec.exemptions.json   # TypeScript 安全检查 (tsec) 豁免配置
+├── test/                      # 测试文件 (单元测试, 集成测试, 冒烟测试)
+├── .editorconfig              # 跨编辑器代码风格规则
+├── .eslint*                   # ESLint 代码检查配置
+├── .git*                      # Git 相关配置 (.gitignore, .gitattributes等)
+├── .nvmrc                     # 项目推荐的 Node.js 版本
+├── CodeQL.yml                 # GitHub CodeQL (代码扫描) 配置
+├── CONTRIBUTING.md            # 贡献指南
+├── gulpfile.js                # Gulp 构建工具配置
+├── LICENSE.txt                # 开源许可证 (MIT)
+├── package.json               # Node.js 项目核心配置 (元数据, 依赖, 脚本)
+├── package-lock.json          # 锁定依赖版本
+├── product.json               # 产品信息 (名称, 版本, 图标等)
+├── README.md                  # 项目主要说明文件
+├── README-RUN.md              # 翻译后的贡献指南
+├── SECURITY.md                # 安全策略说明
+├── ThirdPartyNotices.txt      # 第三方库许可证声明
+└── tsfmt.json                 # TypeScript 格式化配置 (可能)
+```
+
+## 详细
+
 这是 VS Code (code-oss-dev) 项目的主要目录结构和文件说明：
 
 *   **`.git/`**: Git 版本控制系统目录，包含仓库的所有历史记录和元数据。
