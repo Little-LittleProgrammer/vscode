@@ -6,5 +6,8 @@
 	  "showLineNumbers": true,
 	  "topFilesLength": 10
 	},
-	"include": ["src/**/*" ]
+	"include": ["src/**/*" ],
+	"ignore": {
+		"customPatterns": ["**/*.d.ts", "**/*.test.ts","src/vs/platform/telemetry/common/telemetryUtils.ts"]
+	}
   }

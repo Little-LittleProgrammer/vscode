@@ -836,6 +836,14 @@ function validateIPCHandleLength(handle: string): void {
 	}
 }
 
+/**
+ * 服务端 ipc 服务，主要用于进程间通信
+ * 继承自 IPCServer 类，用于管理客户端连接事件和连接状态
+ *
+ * 提供以下功能：
+ * - 将 Node.js 的 NetServer 转换为客户端连接事件
+ * - 管理服务端连接的生命周期
+ */
 export class Server extends IPCServer {
 
 	private static toClientConnectionEvent(server: NetServer): Event<ClientConnectionEvent> {

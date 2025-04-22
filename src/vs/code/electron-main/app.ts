@@ -124,14 +124,14 @@ import { NativeWebContentExtractorService } from '../../platform/webContentExtra
 import ErrorTelemetry from '../../platform/telemetry/electron-main/errorTelemetry.js';
 
 /**
- * The main VS Code application. There will only ever be one instance,
- * even if the user starts many instances (e.g. from the command line).
+ * 主要的 VS Code 应用程序。只会存在一个实例，
+ * 即使用户启动了多个实例（例如从命令行）。
  */
 export class CodeApplication extends Disposable {
 
 	private static readonly SECURITY_PROTOCOL_HANDLING_CONFIRMATION_SETTING_KEY = {
-		[Schemas.file]: 'security.promptForLocalFileProtocolHandling' as const,
-		[Schemas.vscodeRemote]: 'security.promptForRemoteFileProtocolHandling' as const
+		[Schemas.file]: 'security.promptForLocalFileProtocolHandling' as const, // 文件协议
+		[Schemas.vscodeRemote]: 'security.promptForRemoteFileProtocolHandling' as const // vscode-remote 协议
 	};
 
 	private windowsMainService: IWindowsMainService | undefined;
@@ -160,9 +160,9 @@ export class CodeApplication extends Disposable {
 
 	private configureSession(): void {
 
-		//#region Security related measures (https://electronjs.org/docs/tutorial/security)
+		//#region 安全相关措施 (https://electronjs.org/docs/tutorial/security)
 		//
-		// !!! DO NOT CHANGE without consulting the documentation !!!
+		// !!! 在未查阅文档的情况下请勿更改 !!!
 		//
 
 		const isUrlFromWindow = (requestingUrl?: string | undefined) => requestingUrl?.startsWith(`${Schemas.vscodeFileResource}://${VSCODE_AUTHORITY}`);
@@ -171,7 +171,7 @@ export class CodeApplication extends Disposable {
 		const allowedPermissionsInWebview = new Set([
 			'clipboard-read',
 			'clipboard-sanitized-write',
-			// TODO(deepak1556): Should be removed once migration is complete
+			// TODO(deepak1556): 迁移完成后应移除
 			// https://github.com/microsoft/vscode/issues/239228
 			'deprecated-sync-clipboard-read',
 		]);
@@ -179,7 +179,7 @@ export class CodeApplication extends Disposable {
 		const allowedPermissionsInCore = new Set([
 			'media',
 			'local-fonts',
-			// TODO(deepak1556): Should be removed once migration is complete
+			// TODO(deepak1556): 迁移完成后应移除
 			// https://github.com/microsoft/vscode/issues/239228
 			'deprecated-sync-clipboard-read',
 		]);
@@ -206,12 +206,12 @@ export class CodeApplication extends Disposable {
 
 		//#endregion
 
-		//#region Request filtering
+		//#region 请求过滤
 
-		// Block all SVG requests from unsupported origins
+		// 阻止来自不支持来源的所有 SVG 请求
 		const supportedSvgSchemes = new Set([Schemas.file, Schemas.vscodeFileResource, Schemas.vscodeRemoteResource, Schemas.vscodeManagedRemoteResource, 'devtools']);
 
-		// But allow them if they are made from inside an webview
+		// 但如果请求来自 webview 内部，则允许
 		const isSafeFrame = (requestFrame: WebFrameMain | null | undefined): boolean => {
 			for (let frame: WebFrameMain | null | undefined = requestFrame; frame; frame = frame.parent) {
 				if (frame.url.startsWith(`${Schemas.vscodeWebview}://`)) {
@@ -231,7 +231,7 @@ export class CodeApplication extends Disposable {
 				return false;
 			}
 
-			// Check to see if the request comes from one of the main windows (or shared process) and not from embedded content
+			// 检查请求是否来自主窗口之一（或共享进程），而不是来自嵌入内容
 			const windows = getAllWindowsExcludingOffscreen();
 			for (const window of windows) {
 				if (frame.processId === window.webContents.mainFrame.processId) {
@@ -244,7 +244,7 @@ export class CodeApplication extends Disposable {
 
 		const isAllowedWebviewRequest = (uri: URI, details: Electron.OnBeforeRequestListenerDetails): boolean => {
 			if (uri.path !== '/index.html') {
-				return true; // Only restrict top level page of webviews: index.html
+				return true; // 仅限制 webview 的顶层页面：index.html
 			}
 
 			const frame = details.frame;
@@ -252,7 +252,7 @@ export class CodeApplication extends Disposable {
 				return false;
 			}
 
-			// Check to see if the request comes from one of the main editor windows.
+			// 检查请求是否来自主编辑器窗口之一。
 			for (const window of this.windowsMainService.getWindows()) {
 				if (window.win) {
 					if (frame.processId === window.win.webContents.mainFrame.processId) {
@@ -280,7 +280,7 @@ export class CodeApplication extends Disposable {
 				}
 			}
 
-			// Block most svgs
+			// 阻止大多数 SVG
 			if (uri.path.endsWith('.svg')) {
 				const isSafeResourceUrl = supportedSvgSchemes.has(uri.scheme);
 				if (!isSafeResourceUrl) {
@@ -291,7 +291,7 @@ export class CodeApplication extends Disposable {
 			return callback({ cancel: false });
 		});
 
-		// Configure SVG header content type properly
+		// 正确配置 SVG 头部的 content-type
 		// https://github.com/microsoft/vscode/issues/97564
 		session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
 			const responseHeaders = details.responseHeaders as Record<string, (string) | (string[])>;
@@ -307,7 +307,7 @@ export class CodeApplication extends Disposable {
 					}
 				}
 
-				// remote extension schemes have the following format
+				// 远程扩展 scheme 具有以下格式
 				// http://127.0.0.1:<port>/vscode-remote-resource?path=
 				if (!uri.path.endsWith(Schemas.vscodeRemoteResource) && contentTypes.some(contentType => contentType.toLowerCase().includes('image/svg'))) {
 					return callback({ cancel: !isSvgRequestFromSafeContext(details) });
@@ -319,7 +319,7 @@ export class CodeApplication extends Disposable {
 
 		//#endregion
 
-		//#region Allow CORS for the PRSS CDN
+		//#region 允许 PRSS CDN 的 CORS
 
 		// https://github.com/microsoft/vscode-remote-release/issues/9246
 		session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -337,28 +337,26 @@ export class CodeApplication extends Disposable {
 
 		//#endregion
 
-		//#region Code Cache
+		//#region 代码缓存
 
 		type SessionWithCodeCachePathSupport = Session & {
 			/**
-			 * Sets code cache directory. By default, the directory will be `Code Cache` under
-			 * the respective user data folder.
+			 * 设置代码缓存目录。默认情况下，该目录将是相应用户数据文件夹下的 `Code Cache`。
 			 */
 			setCodeCachePath?(path: string): void;
 		};
 
 		const defaultSession = session.defaultSession as unknown as SessionWithCodeCachePathSupport;
 		if (typeof defaultSession.setCodeCachePath === 'function' && this.environmentMainService.codeCachePath) {
-			// Make sure to partition Chrome's code cache folder
-			// in the same way as our code cache path to help
-			// invalidate caches that we know are invalid
+			// 确保以与我们的代码缓存路径相同的方式对 Chrome 的代码缓存文件夹进行分区
+			// 以帮助使我们知道无效的缓存失效
 			// (https://github.com/microsoft/vscode/issues/120655)
 			defaultSession.setCodeCachePath(join(this.environmentMainService.codeCachePath, 'chrome'));
 		}
 
 		//#endregion
 
-		//#region UNC Host Allowlist (Windows)
+		//#region UNC 主机允许列表 (Windows)
 
 		if (isWindows) {
 			if (this.configurationService.getValue('security.restrictUNCAccess') === false) {
@@ -373,52 +371,52 @@ export class CodeApplication extends Disposable {
 
 	private registerListeners(): void {
 
-		// Dispose on shutdown
+		// 在关闭时释放
 		Event.once(this.lifecycleMainService.onWillShutdown)(() => this.dispose());
 
-		// Contextmenu via IPC support
+		// 通过 IPC 支持上下文菜单
 		registerContextMenuListener();
 
-		// Accessibility change event
+		// 可访问性更改事件
 		app.on('accessibility-support-changed', (event, accessibilitySupportEnabled) => {
 			this.windowsMainService?.sendToAll('vscode:accessibilitySupportChanged', accessibilitySupportEnabled);
 		});
 
-		// macOS dock activate
+		// macOS dock 激活
 		app.on('activate', async (event, hasVisibleWindows) => {
 			this.logService.trace('app#activate');
 
-			// Mac only event: open new window when we get activated
+			// 仅 macOS 事件：当应用被激活时打开新窗口
 			if (!hasVisibleWindows) {
 				await this.windowsMainService?.openEmptyWindow({ context: OpenContext.DOCK });
 			}
 		});
 
-		//#region Security related measures (https://electronjs.org/docs/tutorial/security)
+		//#region 安全相关措施 (https://electronjs.org/docs/tutorial/security)
 		//
-		// !!! DO NOT CHANGE without consulting the documentation !!!
+		// !!! 在未查阅文档的情况下请勿更改 !!!
 		//
 		app.on('web-contents-created', (event, contents) => {
 
-			// Auxiliary Window: delegate to `AuxiliaryWindow` class
+			// 辅助窗口：委托给 `AuxiliaryWindow` 类
 			if (contents?.opener?.url.startsWith(`${Schemas.vscodeFileResource}://${VSCODE_AUTHORITY}/`)) {
 				this.logService.trace('[aux window]  app.on("web-contents-created"): Registering auxiliary window');
 
 				this.auxiliaryWindowsMainService?.registerWindow(contents);
 			}
 
-			// Block any in-page navigation
+			// 阻止任何页面内导航
 			contents.on('will-navigate', event => {
 				this.logService.error('webContents#will-navigate: Prevented webcontent navigation');
 
 				event.preventDefault();
 			});
 
-			// All Windows: only allow about:blank auxiliary windows to open
-			// For all other URLs, delegate to the OS.
+			// 所有窗口：只允许 about:blank 辅助窗口打开
+			// 对于所有其他 URL，委托给操作系统。
 			contents.setWindowOpenHandler(details => {
 
-				// about:blank windows can open as window witho our default options
+				// about:blank 窗口可以使用我们的默认选项打开
 				if (details.url === 'about:blank') {
 					this.logService.trace('[aux window] webContents#setWindowOpenHandler: Allowing auxiliary window to open on about:blank');
 
@@ -428,7 +426,7 @@ export class CodeApplication extends Disposable {
 					};
 				}
 
-				// Any other URL: delegate to OS
+				// 任何其他 URL：委托给操作系统
 				else {
 					this.logService.trace(`webContents#setWindowOpenHandler: Prevented opening window with URL ${details.url}}`);
 
@@ -444,28 +442,28 @@ export class CodeApplication extends Disposable {
 		let macOpenFileURIs: IWindowOpenable[] = [];
 		let runningTimeout: NodeJS.Timeout | undefined = undefined;
 		app.on('open-file', (event, path) => {
-			path = normalizeNFC(path); // macOS only: normalize paths to NFC form
+			path = normalizeNFC(path); // 仅 macOS：将路径规范化为 NFC 形式
 
 			this.logService.trace('app#open-file: ', path);
 			event.preventDefault();
 
-			// Keep in array because more might come!
+			// 保留在数组中，因为可能还有更多！
 			macOpenFileURIs.push(hasWorkspaceFileExtension(path) ? { workspaceUri: URI.file(path) } : { fileUri: URI.file(path) });
 
-			// Clear previous handler if any
+			// 如果有，清除之前的处理程序
 			if (runningTimeout !== undefined) {
 				clearTimeout(runningTimeout);
 				runningTimeout = undefined;
 			}
 
-			// Handle paths delayed in case more are coming!
+			// 延迟处理路径，以防还有更多路径！
 			runningTimeout = setTimeout(async () => {
 				await this.windowsMainService?.open({
-					context: OpenContext.DOCK /* can also be opening from finder while app is running */,
+					context: OpenContext.DOCK /* 也可能是应用运行时从 finder 打开 */,
 					cli: this.environmentMainService.args,
 					urisToOpen: macOpenFileURIs,
 					gotoLineMode: false,
-					preferNewWindow: true /* dropping on the dock or opening from finder prefers to open in a new window */
+					preferNewWindow: true /* 拖放到 dock 或从 finder 打开时倾向于在新窗口中打开 */
 				});
 
 				macOpenFileURIs = [];
@@ -474,22 +472,19 @@ export class CodeApplication extends Disposable {
 		});
 
 		app.on('new-window-for-tab', async () => {
-			await this.windowsMainService?.openEmptyWindow({ context: OpenContext.DESKTOP }); //macOS native tab "+" button
+			await this.windowsMainService?.openEmptyWindow({ context: OpenContext.DESKTOP }); //macOS 原生标签页 "+" 按钮
 		});
 
-		//#region Bootstrap IPC Handlers
+		//#region 引导 IPC 处理程序
 
 		validatedIpcMain.handle('vscode:fetchShellEnv', event => {
 
-			// Prefer to use the args and env from the target window
-			// when resolving the shell env. It is possible that
-			// a first window was opened from the UI but a second
-			// from the CLI and that has implications for whether to
-			// resolve the shell environment or not.
+			// 解析 shell env 时，优先使用目标窗口的 args 和 env。
+			// 可能第一个窗口是从 UI 打开的，但第二个窗口是从 CLI 打开的，
+			// 这对是否解析 shell 环境有影响。
 			//
-			// Window can be undefined for e.g. the shared process
-			// that is not part of our windows registry!
-			const window = this.windowsMainService?.getWindowByWebContents(event.sender); // Note: this can be `undefined` for the shared process
+			// 对于不属于我们窗口注册表一部分的共享进程等，窗口可能为 undefined！
+			const window = this.windowsMainService?.getWindowByWebContents(event.sender); // 注意：对于共享进程，这可能是 `undefined`
 			let args: NativeParsedArgs;
 			let env: IProcessEnvironment;
 			if (window?.config) {
@@ -500,7 +495,7 @@ export class CodeApplication extends Disposable {
 				env = process.env;
 			}
 
-			// Resolve shell env
+			// 解析 shell 环境
 			return this.resolveShellEnvironment(args, env, false);
 		});
 
@@ -520,25 +515,25 @@ export class CodeApplication extends Disposable {
 	}
 
 	async startup(): Promise<void> {
+		// 启动 VS Code
 		this.logService.debug('Starting VS Code');
-		this.logService.debug(`from: ${this.environmentMainService.appRoot}`);
-		this.logService.debug('args:', this.environmentMainService.args);
+		this.logService.debug(`from: ${this.environmentMainService.appRoot}`); // 从哪个目录启动
+		this.logService.debug('args:', this.environmentMainService.args); // 启动参数
 
-		// Make sure we associate the program with the app user model id
-		// This will help Windows to associate the running program with
-		// any shortcut that is pinned to the taskbar and prevent showing
-		// two icons in the taskbar for the same app.
+		// 确保我们将程序与 app user model id 关联起来
+		// 这将有助于 Windows 将正在运行的程序与
+		// 任何固定到任务栏的快捷方式关联起来，并防止
+		// 在任务栏中为同一应用显示两个图标。
 		const win32AppUserModelId = this.productService.win32AppUserModelId;
 		if (isWindows && win32AppUserModelId) {
 			app.setAppUserModelId(win32AppUserModelId);
 		}
 
-		// Fix native tabs on macOS 10.13
-		// macOS enables a compatibility patch for any bundle ID beginning with
-		// "com.microsoft.", which breaks native tabs for VS Code when using this
-		// identifier (from the official build).
-		// Explicitly opt out of the patch here before creating any windows.
-		// See: https://github.com/microsoft/vscode/issues/35361#issuecomment-399794085
+		// 修复 macOS 10.13 上的原生标签页
+		// macOS 对以 "com.microsoft." 开头的任何 bundle ID 启用兼容性补丁，
+		// 这在使用此标识符（来自官方构建）时会破坏 VS Code 的原生标签页。
+		// 在创建任何窗口之前，在此处明确选择退出补丁。
+		// 参见：https://github.com/microsoft/vscode/issues/35361#issuecomment-399794085
 		try {
 			if (isMacintosh && this.configurationService.getValue('window.nativeTabs') === true && !systemPreferences.getUserDefault('NSUseImprovedLayoutPass', 'boolean')) {
 				systemPreferences.setUserDefault('NSUseImprovedLayoutPass', 'boolean', true as any);
@@ -547,20 +542,20 @@ export class CodeApplication extends Disposable {
 			this.logService.error(error);
 		}
 
-		// Main process server (electron IPC based)
+		// 主进程服务 (基于 electron IPC)
 		const mainProcessElectronServer = new ElectronIPCServer();
 		Event.once(this.lifecycleMainService.onWillShutdown)(e => {
 			if (e.reason === ShutdownReason.KILL) {
-				// When we go down abnormally, make sure to free up
-				// any IPC we accept from other windows to reduce
-				// the chance of doing work after we go down. Kill
-				// is special in that it does not orderly shutdown
-				// windows.
+				// 当我们异常退出时，确保释放
+				// 我们从其他窗口接受的任何 IPC，以减少
+				// 在我们退出后继续工作的可能性。Kill
+				// 特殊之处在于它不会有序地关闭
+				// 窗口。
 				mainProcessElectronServer.dispose();
 			}
 		});
 
-		// Resolve unique machine ID
+		// 解析唯一的机器 ID
 		this.logService.trace('Resolving machine identifier...');
 		const [machineId, sqmId, devDeviceId] = await Promise.all([
 			resolveMachineId(this.stateService, this.logService),
@@ -569,50 +564,50 @@ export class CodeApplication extends Disposable {
 		]);
 		this.logService.trace(`Resolved machine identifier: ${machineId}`);
 
-		// Shared process
+		// 共享进程
 		const { sharedProcessReady, sharedProcessClient } = this.setupSharedProcess(machineId, sqmId, devDeviceId);
 
-		// Services
+		// 服务
 		const appInstantiationService = await this.initServices(machineId, sqmId, devDeviceId, sharedProcessReady);
 
-		// Error telemetry
+		// 错误遥测
 		appInstantiationService.invokeFunction(accessor => this._register(new ErrorTelemetry(accessor.get(ILogService), accessor.get(ITelemetryService))));
 
-		// Auth Handler
+		// 认证处理程序
 		appInstantiationService.invokeFunction(accessor => accessor.get(IProxyAuthService));
 
-		// Transient profiles handler
+		// 瞬态配置文件处理程序
 		this._register(appInstantiationService.createInstance(UserDataProfilesHandler));
 
-		// Init Channels
+		// 初始化通道
 		appInstantiationService.invokeFunction(accessor => this.initChannels(accessor, mainProcessElectronServer, sharedProcessClient));
 
-		// Setup Protocol URL Handlers
+		// 设置协议 URL 处理程序
 		const initialProtocolUrls = await appInstantiationService.invokeFunction(accessor => this.setupProtocolUrlHandlers(accessor, mainProcessElectronServer));
 
-		// Setup vscode-remote-resource protocol handler
+		// 设置 vscode-remote-resource 协议处理程序
 		this.setupManagedRemoteResourceUrlHandler(mainProcessElectronServer);
 
-		// Signal phase: ready - before opening first window
+		// 信号阶段：ready - 在打开第一个窗口之前
 		this.lifecycleMainService.phase = LifecycleMainPhase.Ready;
 
-		// Open Windows
+		// 打开窗口
 		await appInstantiationService.invokeFunction(accessor => this.openFirstWindow(accessor, initialProtocolUrls));
 
-		// Signal phase: after window open
+		// 信号阶段：窗口打开后
 		this.lifecycleMainService.phase = LifecycleMainPhase.AfterWindowOpen;
 
-		// Post Open Windows Tasks
+		// 窗口打开后的任务
 		this.afterWindowOpen();
 
-		// Set lifecycle phase to `Eventually` after a short delay and when idle (min 2.5sec, max 5sec)
+		// 在短暂延迟后且空闲时将生命周期阶段设置为 `Eventually` (最小 2.5 秒，最大 5 秒)
 		const eventuallyPhaseScheduler = this._register(new RunOnceScheduler(() => {
 			this._register(runWhenGlobalIdle(() => {
 
-				// Signal phase: eventually
+				// 信号阶段：最终
 				this.lifecycleMainService.phase = LifecycleMainPhase.Eventually;
 
-				// Eventually Post Open Window Tasks
+				// 最终的窗口打开后任务
 				this.eventuallyAfterWindowOpen();
 			}, 2500));
 		}, 2500));
@@ -625,9 +620,8 @@ export class CodeApplication extends Disposable {
 		const nativeHostMainService = this.nativeHostMainService = accessor.get(INativeHostMainService);
 		const dialogMainService = accessor.get(IDialogMainService);
 
-		// Install URL handlers that deal with protocl URLs either
-		// from this process by opening windows and/or by forwarding
-		// the URLs into a window process to be handled there.
+		// 安装 URL 处理程序，用于处理来自此进程的协议 URL
+		//（通过打开窗口和/或将 URL 转发到窗口进程中处理）。
 
 		const app = this;
 		urlService.registerHandler({
@@ -677,17 +671,17 @@ export class CodeApplication extends Disposable {
 	private async resolveInitialProtocolUrls(windowsMainService: IWindowsMainService, dialogMainService: IDialogMainService): Promise<IInitialProtocolUrls | undefined> {
 
 		/**
-		 * Protocol URL handling on startup is complex, refer to
-		 * {@link IInitialProtocolUrls} for an explainer.
+		 * 启动时的协议 URL 处理很复杂，请参阅
+		 * {@link IInitialProtocolUrls} 进行解释。
 		 */
 
-		// Windows/Linux: protocol handler invokes CLI with --open-url
+		// Windows/Linux: 协议处理程序使用 --open-url 调用 CLI
 		const protocolUrlsFromCommandLine = this.environmentMainService.args['open-url'] ? this.environmentMainService.args._urls || [] : [];
 		if (protocolUrlsFromCommandLine.length > 0) {
 			this.logService.trace('app#resolveInitialProtocolUrls() protocol urls from command line:', protocolUrlsFromCommandLine);
 		}
 
-		// macOS: open-url events that were received before the app is ready
+		// macOS: 在应用准备就绪之前收到的 open-url 事件
 		const protocolUrlsFromEvent = ((<any>global).getOpenUrls() || []) as string[];
 		if (protocolUrlsFromEvent.length > 0) {
 			this.logService.trace(`app#resolveInitialProtocolUrls() protocol urls from macOS 'open-url' event:`, protocolUrlsFromEvent);
@@ -714,7 +708,7 @@ export class CodeApplication extends Disposable {
 		const urls: IProtocolUrl[] = [];
 		for (const protocolUrl of protocolUrls) {
 			if (!protocolUrl) {
-				continue; // invalid
+				continue; // 无效
 			}
 
 			const windowOpenable = this.getWindowOpenableFromProtocolUrl(protocolUrl.uri);
@@ -722,16 +716,16 @@ export class CodeApplication extends Disposable {
 				if (await this.shouldBlockOpenable(windowOpenable, windowsMainService, dialogMainService)) {
 					this.logService.trace('app#resolveInitialProtocolUrls() protocol url was blocked:', protocolUrl.uri.toString(true));
 
-					continue; // blocked
+					continue; // 已阻止
 				} else {
 					this.logService.trace('app#resolveInitialProtocolUrls() protocol url will be handled as window to open:', protocolUrl.uri.toString(true), windowOpenable);
 
-					openables.push(windowOpenable); // handled as window to open
+					openables.push(windowOpenable); // 作为要打开的窗口处理
 				}
 			} else {
 				this.logService.trace('app#resolveInitialProtocolUrls() protocol url will be passed to active window for handling:', protocolUrl.uri.toString(true));
 
-				urls.push(protocolUrl); // handled within active window
+				urls.push(protocolUrl); // 在活动窗口内处理
 			}
 		}
 
@@ -756,12 +750,11 @@ export class CodeApplication extends Disposable {
 
 			// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			//
-			// NOTE: we currently only ask for confirmation for `file` and `vscode-remote`
-			// authorities here. There is an additional confirmation for `extension.id`
-			// authorities from within the window.
+			// 注意：我们目前仅在此处要求确认 `file` 和 `vscode-remote`
+			// 权限。窗口内还有针对 `extension.id` 权限的额外确认。
 			//
-			// IF YOU ARE PLANNING ON ADDING ANOTHER AUTHORITY HERE, MAKE SURE TO ALSO
-			// ADD IT TO THE CONFIRMATION CODE BELOW OR INSIDE THE WINDOW!
+			// 如果您计划在此处添加另一个权限，请确保也将其添加到
+			// 下面的确认代码或窗口内部！
 			//
 			// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -770,7 +763,7 @@ export class CodeApplication extends Disposable {
 
 		const askForConfirmation = this.configurationService.getValue<unknown>(CodeApplication.SECURITY_PROTOCOL_HANDLING_CONFIRMATION_SETTING_KEY[openableUri.scheme]);
 		if (askForConfirmation === false) {
-			return false; // not blocked via settings
+			return false; // 未通过设置阻止
 		}
 
 		const { response, checkboxChecked } = await dialogMainService.showMessageBox({
@@ -786,20 +779,20 @@ export class CodeApplication extends Disposable {
 		});
 
 		if (response !== 0) {
-			return true; // blocked by user choice
+			return true; // 用户选择阻止
 		}
 
 		if (checkboxChecked) {
-			// Due to https://github.com/microsoft/vscode/issues/195436, we can only
-			// update settings from within a window. But we do not know if a window
-			// is about to open or can already handle the request, so we have to send
-			// to any current window and any newly opening window.
+			// 由于 https://github.com/microsoft/vscode/issues/195436，我们只能
+			// 从窗口内部更新设置。但我们不知道窗口
+			// 是否即将打开或已经可以处理请求，因此我们必须发送
+			// 到任何当前窗口和任何新打开的窗口。
 			const request = { channel: 'vscode:disablePromptForProtocolHandling', args: openableUri.scheme === Schemas.file ? 'local' : 'remote' };
 			windowsMainService.sendToFocused(request.channel, request.args);
 			windowsMainService.sendToOpeningWindow(request.channel, request.args);
 		}
 
-		return false; // not blocked by user choice
+		return false; // 用户选择不阻止
 	}
 
 	private getWindowOpenableFromProtocolUrl(uri: URI): IWindowOpenable | undefined {
@@ -807,7 +800,7 @@ export class CodeApplication extends Disposable {
 			return undefined;
 		}
 
-		// File path
+		// 文件路径
 		if (uri.authority === Schemas.file) {
 			const fileUri = URI.file(uri.fsPath);
 
@@ -818,14 +811,14 @@ export class CodeApplication extends Disposable {
 			return { fileUri };
 		}
 
-		// Remote path
+		// 远程路径
 		else if (uri.authority === Schemas.vscodeRemote) {
 
-			// Example conversion:
-			// From: vscode://vscode-remote/wsl+ubuntu/mnt/c/GitDevelopment/monaco
-			//   To: vscode-remote://wsl+ubuntu/mnt/c/GitDevelopment/monaco
+			// 示例转换：
+			// 从: vscode://vscode-remote/wsl+ubuntu/mnt/c/GitDevelopment/monaco
+			//   到: vscode-remote://wsl+ubuntu/mnt/c/GitDevelopment/monaco
 
-			const secondSlash = uri.path.indexOf(posix.sep, 1 /* skip over the leading slash */);
+			const secondSlash = uri.path.indexOf(posix.sep, 1 /* 跳过前导斜杠 */);
 			let authority: string;
 			let path: string;
 			if (secondSlash !== -1) {
@@ -839,7 +832,7 @@ export class CodeApplication extends Disposable {
 			let query = uri.query;
 			const params = new URLSearchParams(uri.query);
 			if (params.get('windowId') === '_blank') {
-				// Make sure to unset any `windowId=_blank` here
+				// 确保在此处取消设置任何 `windowId=_blank`
 				// https://github.com/microsoft/vscode/issues/191902
 				params.delete('windowId');
 				query = params.toString();
@@ -852,7 +845,7 @@ export class CodeApplication extends Disposable {
 			}
 
 			if (/:[\d]+$/.test(path)) {
-				// path with :line:column syntax
+				// 带有 :line:column 语法的路径
 				return { fileUri: remoteUri };
 			}
 
@@ -864,7 +857,7 @@ export class CodeApplication extends Disposable {
 	private async handleProtocolUrl(windowsMainService: IWindowsMainService, dialogMainService: IDialogMainService, urlService: IURLService, uri: URI, options?: IOpenURLOptions): Promise<boolean> {
 		this.logService.trace('app#handleProtocolUrl():', uri.toString(true), options);
 
-		// Support 'workspace' URLs (https://github.com/microsoft/vscode/issues/124263)
+		// 支持 'workspace' URL (https://github.com/microsoft/vscode/issues/124263)
 		if (uri.scheme === this.productService.urlProtocol && uri.path === 'workspace') {
 			uri = uri.with({
 				authority: 'file',
@@ -875,25 +868,14 @@ export class CodeApplication extends Disposable {
 
 		let shouldOpenInNewWindow = false;
 
-		// We should handle the URI in a new window if the URL contains `windowId=_blank`
-		const params = new URLSearchParams(uri.query);
-		if (params.get('windowId') === '_blank') {
-			this.logService.trace(`app#handleProtocolUrl() found 'windowId=_blank' as parameter, setting shouldOpenInNewWindow=true:`, uri.toString(true));
-
-			params.delete('windowId');
-			uri = uri.with({ query: params.toString() });
-
-			shouldOpenInNewWindow = true;
-		}
-
-		// or if no window is open (macOS only)
+		// 或者如果没有窗口打开 (仅限 macOS)
 		else if (isMacintosh && windowsMainService.getWindowCount() === 0) {
 			this.logService.trace(`app#handleProtocolUrl() running on macOS with no window open, setting shouldOpenInNewWindow=true:`, uri.toString(true));
 
 			shouldOpenInNewWindow = true;
 		}
 
-		// Pass along whether the application is being opened via a Continue On flow
+		// 传递应用程序是否通过 Continue On 流打开
 		const continueOn = params.get('continueOn');
 		if (continueOn !== null) {
 			this.logService.trace(`app#handleProtocolUrl() found 'continueOn' as parameter:`, uri.toString(true));
@@ -904,13 +886,13 @@ export class CodeApplication extends Disposable {
 			this.environmentMainService.continueOn = continueOn ?? undefined;
 		}
 
-		// Check if the protocol URL is a window openable to open...
+		// 检查协议 URL 是否是可打开的窗口...
 		const windowOpenableFromProtocolUrl = this.getWindowOpenableFromProtocolUrl(uri);
 		if (windowOpenableFromProtocolUrl) {
 			if (await this.shouldBlockOpenable(windowOpenableFromProtocolUrl, windowsMainService, dialogMainService)) {
 				this.logService.trace('app#handleProtocolUrl() protocol url was blocked:', uri.toString(true));
 
-				return true; // If openable should be blocked, behave as if it's handled
+				return true; // 如果 openable 应被阻止，则表现得好像已处理
 			} else {
 				this.logService.trace('app#handleProtocolUrl() opening protocol url as window:', windowOpenableFromProtocolUrl, uri.toString(true));
 
@@ -920,16 +902,16 @@ export class CodeApplication extends Disposable {
 					urisToOpen: [windowOpenableFromProtocolUrl],
 					forceNewWindow: shouldOpenInNewWindow,
 					gotoLineMode: true
-					// remoteAuthority: will be determined based on windowOpenableFromProtocolUrl
+					// remoteAuthority: 将根据 windowOpenableFromProtocolUrl 确定
 				})).at(0);
 
-				window?.focus(); // this should help ensuring that the right window gets focus when multiple are opened
+				window?.focus(); // 这应该有助于确保在打开多个窗口时正确的窗口获得焦点
 
 				return true;
 			}
 		}
 
-		// ...or if we should open in a new window and then handle it within that window
+		// ...或者我们是否应该在新窗口中打开，然后在该窗口内处理它
 		if (shouldOpenInNewWindow) {
 			this.logService.trace('app#handleProtocolUrl() opening empty window and passing in protocol url:', uri.toString(true));
 
@@ -979,7 +961,7 @@ export class CodeApplication extends Disposable {
 	private async initServices(machineId: string, sqmId: string, devDeviceId: string, sharedProcessReady: Promise<MessagePortClient>): Promise<IInstantiationService> {
 		const services = new ServiceCollection();
 
-		// Update
+		// 更新
 		switch (process.platform) {
 			case 'win32':
 				services.set(IUpdateService, new SyncDescriptor(Win32UpdateService));
@@ -998,50 +980,50 @@ export class CodeApplication extends Disposable {
 				break;
 		}
 
-		// Windows
+		// 窗口
 		services.set(IWindowsMainService, new SyncDescriptor(WindowsMainService, [machineId, sqmId, devDeviceId, this.userEnv], false));
 		services.set(IAuxiliaryWindowsMainService, new SyncDescriptor(AuxiliaryWindowsMainService, undefined, false));
 
-		// Dialogs
+		// 对话框
 		const dialogMainService = new DialogMainService(this.logService, this.productService);
 		services.set(IDialogMainService, dialogMainService);
 
-		// Launch
-		services.set(ILaunchMainService, new SyncDescriptor(LaunchMainService, undefined, false /* proxied to other processes */));
+		// 启动
+		services.set(ILaunchMainService, new SyncDescriptor(LaunchMainService, undefined, false /* 代理到其他进程 */));
 
-		// Diagnostics
-		services.set(IDiagnosticsMainService, new SyncDescriptor(DiagnosticsMainService, undefined, false /* proxied to other processes */));
+		// 诊断
+		services.set(IDiagnosticsMainService, new SyncDescriptor(DiagnosticsMainService, undefined, false /* 代理到其他进程 */));
 		services.set(IDiagnosticsService, ProxyChannel.toService(getDelayedChannel(sharedProcessReady.then(client => client.getChannel('diagnostics')))));
 
-		// Process
+		// 进程
 		services.set(IProcessMainService, new SyncDescriptor(ProcessMainService, [this.userEnv]));
 
-		// Encryption
+		// 加密
 		services.set(IEncryptionMainService, new SyncDescriptor(EncryptionMainService));
 
-		// Keyboard Layout
+		// 键盘布局
 		services.set(IKeyboardLayoutMainService, new SyncDescriptor(KeyboardLayoutMainService));
 
-		// Native Host
-		services.set(INativeHostMainService, new SyncDescriptor(NativeHostMainService, undefined, false /* proxied to other processes */));
+		// 原生主机
+		services.set(INativeHostMainService, new SyncDescriptor(NativeHostMainService, undefined, false /* 代理到其他进程 */));
 
-		// Web Contents Extractor
-		services.set(IWebContentExtractorService, new SyncDescriptor(NativeWebContentExtractorService, undefined, false /* proxied to other processes */));
+		// Web 内容提取器
+		services.set(IWebContentExtractorService, new SyncDescriptor(NativeWebContentExtractorService, undefined, false /* 代理到其他进程 */));
 
-		// Webview Manager
+		// Webview 管理器
 		services.set(IWebviewManagerService, new SyncDescriptor(WebviewMainService));
 
-		// Menubar
+		// 菜单栏
 		services.set(IMenubarMainService, new SyncDescriptor(MenubarMainService));
 
-		// Extension Host Starter
+		// 扩展主机启动器
 		services.set(IExtensionHostStarter, new SyncDescriptor(ExtensionHostStarter));
 
-		// Storage
+		// 存储
 		services.set(IStorageMainService, new SyncDescriptor(StorageMainService));
 		services.set(IApplicationStorageMainService, new SyncDescriptor(ApplicationStorageMainService));
 
-		// Terminal
+		// 终端
 		const ptyHostStarter = new ElectronPtyHostStarter({
 			graceTime: LocalReconnectConstants.GraceTime,
 			shortGraceTime: LocalReconnectConstants.ShortGraceTime,
@@ -1055,7 +1037,7 @@ export class CodeApplication extends Disposable {
 		);
 		services.set(ILocalPtyService, ptyHostService);
 
-		// External terminal
+		// 外部终端
 		if (isWindows) {
 			services.set(IExternalTerminalMainService, new SyncDescriptor(WindowsExternalTerminalService));
 		} else if (isMacintosh) {
@@ -1064,20 +1046,20 @@ export class CodeApplication extends Disposable {
 			services.set(IExternalTerminalMainService, new SyncDescriptor(LinuxExternalTerminalService));
 		}
 
-		// Backups
+		// 备份
 		const backupMainService = new BackupMainService(this.environmentMainService, this.configurationService, this.logService, this.stateService);
 		services.set(IBackupMainService, backupMainService);
 
-		// Workspaces
+		// 工作区
 		const workspacesManagementMainService = new WorkspacesManagementMainService(this.environmentMainService, this.logService, this.userDataProfilesMainService, backupMainService, dialogMainService);
 		services.set(IWorkspacesManagementMainService, workspacesManagementMainService);
-		services.set(IWorkspacesService, new SyncDescriptor(WorkspacesMainService, undefined, false /* proxied to other processes */));
+		services.set(IWorkspacesService, new SyncDescriptor(WorkspacesMainService, undefined, false /* 代理到其他进程 */));
 		services.set(IWorkspacesHistoryMainService, new SyncDescriptor(WorkspacesHistoryMainService, undefined, false));
 
-		// URL handling
-		services.set(IURLService, new SyncDescriptor(NativeURLService, undefined, false /* proxied to other processes */));
+		// URL 处理
+		services.set(IURLService, new SyncDescriptor(NativeURLService, undefined, false /* 代理到其他进程 */));
 
-		// Telemetry
+		// 遥测
 		if (supportsTelemetry(this.productService, this.environmentMainService)) {
 			const isInternal = isInternalTelemetry(this.productService, this.configurationService);
 			const channel = getDelayedChannel(sharedProcessReady.then(client => client.getChannel('telemetryAppender')));
@@ -1091,24 +1073,24 @@ export class CodeApplication extends Disposable {
 			services.set(ITelemetryService, NullTelemetryService);
 		}
 
-		// Default Extensions Profile Init
+		// 默认扩展配置文件初始化
 		services.set(IExtensionsProfileScannerService, new SyncDescriptor(ExtensionsProfileScannerService, undefined, true));
 		services.set(IExtensionsScannerService, new SyncDescriptor(ExtensionsScannerService, undefined, true));
 
-		// Utility Process Worker
+		// 实用工具进程工作线程
 		services.set(IUtilityProcessWorkerMainService, new SyncDescriptor(UtilityProcessWorkerMainService, undefined, true));
 
-		// Proxy Auth
+		// 代理认证
 		services.set(IProxyAuthService, new SyncDescriptor(ProxyAuthService));
 
 		// MCP
 		services.set(INativeMcpDiscoveryHelperService, new SyncDescriptor(NativeMcpDiscoveryHelperService));
 
 
-		// Dev Only: CSS service (for ESM)
+		// 仅开发：CSS 服务 (用于 ESM)
 		services.set(ICSSDevelopmentService, new SyncDescriptor(CSSDevelopmentService, undefined, true));
 
-		// Init services that require it
+		// 初始化需要初始化的服务
 		await Promises.settled([
 			backupMainService.initialize(),
 			workspacesManagementMainService.initialize()
@@ -1119,10 +1101,10 @@ export class CodeApplication extends Disposable {
 
 	private initChannels(accessor: ServicesAccessor, mainProcessElectronServer: ElectronIPCServer, sharedProcessClient: Promise<MessagePortClient>): void {
 
-		// Channels registered to node.js are exposed to second instances
-		// launching because that is the only way the second instance
-		// can talk to the first instance. Electron IPC does not work
-		// across apps until `requestSingleInstance` APIs are adopted.
+		// 注册到 node.js 的通道会暴露给第二个实例
+		// 启动，因为这是第二个实例与第一个实例
+		// 通信的唯一方式。Electron IPC 在应用之间不起作用，
+		// 直到采用 `requestSingleInstance` API。
 
 		const disposables = this._register(new DisposableStore());
 
@@ -1132,83 +1114,83 @@ export class CodeApplication extends Disposable {
 		const diagnosticsChannel = ProxyChannel.fromService(accessor.get(IDiagnosticsMainService), disposables, { disableMarshalling: true });
 		this.mainProcessNodeIpcServer.registerChannel('diagnostics', diagnosticsChannel);
 
-		// Policies (main & shared process)
+		// 策略 (主进程和共享进程)
 		const policyChannel = disposables.add(new PolicyChannel(accessor.get(IPolicyService)));
 		mainProcessElectronServer.registerChannel('policy', policyChannel);
 		sharedProcessClient.then(client => client.registerChannel('policy', policyChannel));
 
-		// Local Files
+		// 本地文件
 		const diskFileSystemProvider = this.fileService.getProvider(Schemas.file);
 		assertType(diskFileSystemProvider instanceof DiskFileSystemProvider);
 		const fileSystemProviderChannel = disposables.add(new DiskFileSystemProviderChannel(diskFileSystemProvider, this.logService, this.environmentMainService));
 		mainProcessElectronServer.registerChannel(LOCAL_FILE_SYSTEM_CHANNEL_NAME, fileSystemProviderChannel);
 		sharedProcessClient.then(client => client.registerChannel(LOCAL_FILE_SYSTEM_CHANNEL_NAME, fileSystemProviderChannel));
 
-		// User Data Profiles
+		// 用户数据配置文件
 		const userDataProfilesService = ProxyChannel.fromService(accessor.get(IUserDataProfilesMainService), disposables);
 		mainProcessElectronServer.registerChannel('userDataProfiles', userDataProfilesService);
 		sharedProcessClient.then(client => client.registerChannel('userDataProfiles', userDataProfilesService));
 
-		// Update
+		// 更新
 		const updateChannel = new UpdateChannel(accessor.get(IUpdateService));
 		mainProcessElectronServer.registerChannel('update', updateChannel);
 
-		// Process
+		// 进程
 		const processChannel = ProxyChannel.fromService(accessor.get(IProcessMainService), disposables);
 		mainProcessElectronServer.registerChannel('process', processChannel);
 
-		// Encryption
+		// 加密
 		const encryptionChannel = ProxyChannel.fromService(accessor.get(IEncryptionMainService), disposables);
 		mainProcessElectronServer.registerChannel('encryption', encryptionChannel);
 
-		// Signing
+		// 签名
 		const signChannel = ProxyChannel.fromService(accessor.get(ISignService), disposables);
 		mainProcessElectronServer.registerChannel('sign', signChannel);
 
-		// Keyboard Layout
+		// 键盘布局
 		const keyboardLayoutChannel = ProxyChannel.fromService(accessor.get(IKeyboardLayoutMainService), disposables);
 		mainProcessElectronServer.registerChannel('keyboardLayout', keyboardLayoutChannel);
 
-		// Native host (main & shared process)
+		// 原生主机 (主进程和共享进程)
 		this.nativeHostMainService = accessor.get(INativeHostMainService);
 		const nativeHostChannel = ProxyChannel.fromService(this.nativeHostMainService, disposables);
 		mainProcessElectronServer.registerChannel('nativeHost', nativeHostChannel);
 		sharedProcessClient.then(client => client.registerChannel('nativeHost', nativeHostChannel));
 
-		// Web Content Extractor
+		// Web 内容提取器
 		const webContentExtractorChannel = ProxyChannel.fromService(accessor.get(IWebContentExtractorService), disposables);
 		mainProcessElectronServer.registerChannel('webContentExtractor', webContentExtractorChannel);
 
-		// Workspaces
+		// 工作区
 		const workspacesChannel = ProxyChannel.fromService(accessor.get(IWorkspacesService), disposables);
 		mainProcessElectronServer.registerChannel('workspaces', workspacesChannel);
 
-		// Menubar
+		// 菜单栏
 		const menubarChannel = ProxyChannel.fromService(accessor.get(IMenubarMainService), disposables);
 		mainProcessElectronServer.registerChannel('menubar', menubarChannel);
 
-		// URL handling
+		// URL 处理
 		const urlChannel = ProxyChannel.fromService(accessor.get(IURLService), disposables);
 		mainProcessElectronServer.registerChannel('url', urlChannel);
 
-		// Webview Manager
+		// Webview 管理器
 		const webviewChannel = ProxyChannel.fromService(accessor.get(IWebviewManagerService), disposables);
 		mainProcessElectronServer.registerChannel('webview', webviewChannel);
 
-		// Storage (main & shared process)
+		// 存储 (主进程和共享进程)
 		const storageChannel = disposables.add((new StorageDatabaseChannel(this.logService, accessor.get(IStorageMainService))));
 		mainProcessElectronServer.registerChannel('storage', storageChannel);
 		sharedProcessClient.then(client => client.registerChannel('storage', storageChannel));
 
-		// Profile Storage Changes Listener (shared process)
+		// 配置文件存储更改侦听器 (共享进程)
 		const profileStorageListener = disposables.add((new ProfileStorageChangesListenerChannel(accessor.get(IStorageMainService), accessor.get(IUserDataProfilesMainService), this.logService)));
 		sharedProcessClient.then(client => client.registerChannel('profileStorageListener', profileStorageListener));
 
-		// Terminal
+		// 终端
 		const ptyHostChannel = ProxyChannel.fromService(accessor.get(ILocalPtyService), disposables);
 		mainProcessElectronServer.registerChannel(TerminalIpcChannels.LocalPty, ptyHostChannel);
 
-		// External Terminal
+		// 外部终端
 		const externalTerminalChannel = ProxyChannel.fromService(accessor.get(IExternalTerminalMainService), disposables);
 		mainProcessElectronServer.registerChannel('externalTerminal', externalTerminalChannel);
 
@@ -1216,20 +1198,20 @@ export class CodeApplication extends Disposable {
 		const mcpDiscoveryChannel = ProxyChannel.fromService(accessor.get(INativeMcpDiscoveryHelperService), disposables);
 		mainProcessElectronServer.registerChannel(NativeMcpDiscoveryHelperChannelName, mcpDiscoveryChannel);
 
-		// Logger
+		// 日志记录器
 		const loggerChannel = new LoggerChannel(accessor.get(ILoggerMainService),);
 		mainProcessElectronServer.registerChannel('logger', loggerChannel);
 		sharedProcessClient.then(client => client.registerChannel('logger', loggerChannel));
 
-		// Extension Host Debug Broadcasting
+		// 扩展主机调试广播
 		const electronExtensionHostDebugBroadcastChannel = new ElectronExtensionHostDebugBroadcastChannel(accessor.get(IWindowsMainService));
 		mainProcessElectronServer.registerChannel('extensionhostdebugservice', electronExtensionHostDebugBroadcastChannel);
 
-		// Extension Host Starter
+		// 扩展主机启动器
 		const extensionHostStarterChannel = ProxyChannel.fromService(accessor.get(IExtensionHostStarter), disposables);
 		mainProcessElectronServer.registerChannel(ipcExtensionHostStarterChannelName, extensionHostStarterChannel);
 
-		// Utility Process Worker
+		// 实用工具进程工作线程
 		const utilityProcessWorkerChannel = ProxyChannel.fromService(accessor.get(IUtilityProcessWorkerMainService), disposables);
 		mainProcessElectronServer.registerChannel(ipcUtilityProcessWorkerChannelName, utilityProcessWorkerChannel);
 	}
@@ -1241,10 +1223,10 @@ export class CodeApplication extends Disposable {
 		const context = isLaunchedFromCli(process.env) ? OpenContext.CLI : OpenContext.DESKTOP;
 		const args = this.environmentMainService.args;
 
-		// First check for windows from protocol links to open
+		// 首先检查是否有来自协议链接的窗口要打开
 		if (initialProtocolUrls) {
 
-			// Openables can open as windows directly
+			// Openables 可以直接作为窗口打开
 			if (initialProtocolUrls.openables.length > 0) {
 				return windowsMainService.open({
 					context,
@@ -1252,25 +1234,24 @@ export class CodeApplication extends Disposable {
 					urisToOpen: initialProtocolUrls.openables,
 					gotoLineMode: true,
 					initialStartup: true
-					// remoteAuthority: will be determined based on openables
+					// remoteAuthority: 将根据 openables 确定
 				});
 			}
 
-			// Protocol links with `windowId=_blank` on startup
-			// should be handled in a special way:
-			// We take the first one of these and open an empty
-			// window for it. This ensures we are not restoring
-			// all windows of the previous session.
-			// If there are any more URLs like these, they will
-			// be handled from the URL listeners installed later.
+			// 启动时带有 `windowId=_blank` 的协议链接
+			// 应以特殊方式处理：
+			// 我们取其中第一个，并为其打开一个空窗口。
+			// 这确保我们不会恢复先前会话的所有窗口。
+			// 如果还有更多类似这样的 URL，它们将
+			// 由稍后安装的 URL 侦听器处理。
 
 			if (initialProtocolUrls.urls.length > 0) {
 				for (const protocolUrl of initialProtocolUrls.urls) {
 					const params = new URLSearchParams(protocolUrl.uri.query);
 					if (params.get('windowId') === '_blank') {
 
-						// It is important here that we remove `windowId=_blank` from
-						// this URL because here we open an empty window for it.
+						// 这里很重要的一点是，我们从这个 URL 中删除了 `windowId=_blank`
+						// 因为我们在这里为它打开了一个空窗口。
 
 						params.delete('windowId');
 						protocolUrl.originalUrl = protocolUrl.uri.toString(true);
@@ -1283,7 +1264,7 @@ export class CodeApplication extends Disposable {
 							forceEmpty: true,
 							gotoLineMode: true,
 							initialStartup: true
-							// remoteAuthority: will be determined based on openables
+							// remoteAuthority: 将根据 openables 确定 (这里应该是 uri?)
 						});
 					}
 				}
@@ -1300,10 +1281,10 @@ export class CodeApplication extends Disposable {
 		const forceProfile = args.profile;
 		const forceTempProfile = args['profile-temp'];
 
-		// Started without file/folder arguments
+		// 在没有文件/文件夹参数的情况下启动
 		if (!hasCliArgs && !hasFolderURIs && !hasFileURIs) {
 
-			// Force new window
+			// 强制打开新窗口
 			if (args['new-window'] || forceProfile || forceTempProfile) {
 				return windowsMainService.open({
 					context,
@@ -1319,25 +1300,25 @@ export class CodeApplication extends Disposable {
 				});
 			}
 
-			// mac: open-file event received on startup
+			// mac: 启动时收到 open-file 事件
 			if (macOpenFiles.length) {
 				return windowsMainService.open({
 					context: OpenContext.DOCK,
 					cli: args,
 					urisToOpen: macOpenFiles.map(path => {
-						path = normalizeNFC(path); // macOS only: normalize paths to NFC form
+						path = normalizeNFC(path); // 仅 macOS：将路径规范化为 NFC 形式
 
 						return (hasWorkspaceFileExtension(path) ? { workspaceUri: URI.file(path) } : { fileUri: URI.file(path) });
 					}),
 					noRecentEntry,
 					waitMarkerFileURI,
 					initialStartup: true,
-					// remoteAuthority: will be determined based on macOpenFiles
+					// remoteAuthority: 将根据 macOpenFiles 确定
 				});
 			}
 		}
 
-		// default: read paths from cli
+		// 默认：从 cli 读取路径
 		return windowsMainService.open({
 			context,
 			cli: args,
@@ -1356,10 +1337,10 @@ export class CodeApplication extends Disposable {
 
 	private afterWindowOpen(): void {
 
-		// Windows: mutex
+		// Windows: 互斥锁
 		this.installMutex();
 
-		// Remote Authorities
+		// 远程 Authority
 		protocol.registerHttpProtocol(Schemas.vscodeRemoteResource, (request, callback) => {
 			callback({
 				url: request.url.replace(/^vscode-remote-resource:/, 'http:'),
@@ -1367,16 +1348,15 @@ export class CodeApplication extends Disposable {
 			});
 		});
 
-		// Start to fetch shell environment (if needed) after window has opened
-		// Since this operation can take a long time, we want to warm it up while
-		// the window is opening.
-		// We also show an error to the user in case this fails.
+		// 在窗口打开后开始获取 shell 环境（如果需要）
+		// 由于此操作可能需要很长时间，我们希望在窗口打开时预热它。
+		// 如果失败，我们还会向用户显示错误。
 		this.resolveShellEnvironment(this.environmentMainService.args, process.env, true);
 
-		// Crash reporter
+		// 崩溃报告器
 		this.updateCrashReporterEnablement();
 
-		// macOS: rosetta translation warning
+		// macOS: rosetta 翻译警告
 		if (isMacintosh && app.runningUnderARM64Translation) {
 			this.windowsMainService?.sendToFocused('vscode:showTranslatedBuildWarning');
 		}
@@ -1412,9 +1392,9 @@ export class CodeApplication extends Disposable {
 
 	private async updateCrashReporterEnablement(): Promise<void> {
 
-		// If enable-crash-reporter argv is undefined then this is a fresh start,
-		// based on `telemetry.enableCrashreporter` settings, generate a UUID which
-		// will be used as crash reporter id and also update the json file.
+		// 如果 enable-crash-reporter argv 未定义，则这是全新启动，
+		// 基于 `telemetry.enableCrashreporter` 设置，生成一个 UUID，
+		// 该 UUID 将用作崩溃报告器 ID，并更新 json 文件。
 
 		try {
 			const argvContent = await this.fileService.readFile(this.environmentMainService.argvResource);
@@ -1423,16 +1403,16 @@ export class CodeApplication extends Disposable {
 			const telemetryLevel = getTelemetryLevel(this.configurationService);
 			const enableCrashReporter = telemetryLevel >= TelemetryLevel.CRASH;
 
-			// Initial startup
+			// 初始启动
 			if (argvJSON['enable-crash-reporter'] === undefined) {
 				const additionalArgvContent = [
 					'',
-					'	// Allows to disable crash reporting.',
-					'	// Should restart the app if the value is changed.',
+					'	// 允许禁用崩溃报告。',
+					'	// 如果更改了该值，应重新启动应用程序。',
 					`	"enable-crash-reporter": ${enableCrashReporter},`,
 					'',
-					'	// Unique id used for correlating crash reports sent from this instance.',
-					'	// Do not edit this value.',
+					'	// 用于关联从此实例发送的崩溃报告的唯一 ID。',
+					'	// 请勿编辑此值。',
 					`	"crash-reporter-id": "${generateUuid()}"`,
 					'}'
 				];
@@ -1441,7 +1421,7 @@ export class CodeApplication extends Disposable {
 				await this.fileService.writeFile(this.environmentMainService.argvResource, VSBuffer.fromString(newArgvString));
 			}
 
-			// Subsequent startup: update crash reporter value if changed
+			// 后续启动：如果更改了值，则更新崩溃报告器值
 			else {
 				const newArgvString = argvString.replace(/"enable-crash-reporter": .*,/, `"enable-crash-reporter": ${enableCrashReporter},`);
 				if (newArgvString !== argvString) {
@@ -1451,15 +1431,15 @@ export class CodeApplication extends Disposable {
 		} catch (error) {
 			this.logService.error(error);
 
-			// Inform the user via notification
+			// 通过通知告知用户
 			this.windowsMainService?.sendToFocused('vscode:showArgvParseWarning');
 		}
 	}
 
 	private eventuallyAfterWindowOpen(): void {
 
-		// Validate Device ID is up to date (delay this as it has shown significant perf impact)
-		// Refs: https://github.com/microsoft/vscode/issues/234064
+		// 验证设备 ID 是否为最新（延迟执行此操作，因为它已显示出显著的性能影响）
+		// 参考: https://github.com/microsoft/vscode/issues/234064
 		validatedevDeviceId(this.stateService, this.logService);
 	}
 }

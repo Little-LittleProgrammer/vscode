@@ -41,6 +41,14 @@ export class EnvironmentMainService extends NativeEnvironmentService implements 
 
 	private _snapEnv: Record<string, string> = {};
 
+	/**
+	 * 获取备份主目录路径
+	 *
+	 * 这个属性使用@memoize装饰器进行缓存，避免重复计算
+	 * 返回用户数据路径下的'Backups'目录路径
+	 *
+	 * @returns {string} 备份主目录路径
+	 */
 	@memoize
 	get backupHome(): string { return join(this.userDataPath, 'Backups'); }
 
@@ -50,6 +58,15 @@ export class EnvironmentMainService extends NativeEnvironmentService implements 
 	@memoize
 	get mainLockfile(): string { return join(this.userDataPath, 'code.lock'); }
 
+	/**
+	 * 获取是否禁用更新的标志
+	 *
+	 * 这个属性使用@memoize装饰器进行缓存，避免重复计算
+	 * 当命令行参数中包含'disable-updates'选项时，返回true表示禁用更新
+	 * 否则返回false表示允许更新
+	 *
+	 * @returns {boolean} 如果禁用更新则返回true，否则返回false
+	 */
 	@memoize
 	get disableUpdates(): boolean { return !!this.args['disable-updates']; }
 

@@ -15,7 +15,7 @@ import { INLSConfiguration } from './vs/nls.js';
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Install a hook to module resolution to map 'fs' to 'original-fs'
+// 安装一个模块解析钩子，将 'fs' 映射到 'original-fs'
 if (process.env['ELECTRON_RUN_AS_NODE'] || process.versions['electron']) {
 	const jsCode = `
 	export async function resolve(specifier, context, nextResolve) {
@@ -27,20 +27,20 @@ if (process.env['ELECTRON_RUN_AS_NODE'] || process.versions['electron']) {
 			};
 		}
 
-		// Defer to the next hook in the chain, which would be the
-		// Node.js default resolve if this is the last user-specified loader.
+		// 委托给链中的下一个钩子，如果这是最后一个用户指定的加载器，
+		// 则将是 Node.js 的默认解析。
 		return nextResolve(specifier, context);
 	}`;
 	register(`data:text/javascript;base64,${Buffer.from(jsCode).toString('base64')}`, import.meta.url);
 }
 
-// Prepare globals that are needed for running
+// 准备运行所需的全局变量
 globalThis._VSCODE_PRODUCT_JSON = { ...product };
 if (process.env['VSCODE_DEV']) {
 	try {
 		const overrides: unknown = require('../product.overrides.json');
 		globalThis._VSCODE_PRODUCT_JSON = Object.assign(globalThis._VSCODE_PRODUCT_JSON, overrides);
-	} catch (error) { /* ignore */ }
+	} catch (error) { /* 忽略 */ }
 }
 globalThis._VSCODE_PACKAGE_JSON = { ...pkg };
 globalThis._VSCODE_FILE_ROOT = __dirname;
@@ -79,8 +79,8 @@ async function doSetupNLS(): Promise<INLSConfiguration | undefined> {
 	}
 
 	if (
-		process.env['VSCODE_DEV'] ||	// no NLS support in dev mode
-		!messagesFile					// no NLS messages file
+		process.env['VSCODE_DEV'] ||	// 开发模式下不支持 NLS
+		!messagesFile					// 没有 NLS 消息文件
 	) {
 		return undefined;
 	}
@@ -90,7 +90,7 @@ async function doSetupNLS(): Promise<INLSConfiguration | undefined> {
 	} catch (error) {
 		console.error(`Error reading NLS messages file ${messagesFile}: ${error}`);
 
-		// Mark as corrupt: this will re-create the language pack cache next startup
+		// 标记为已损坏：这将在下次启动时重新创建语言包缓存
 		if (nlsConfig?.languagePack?.corruptMarkerFile) {
 			try {
 				await fs.promises.writeFile(nlsConfig.languagePack.corruptMarkerFile, 'corrupted');
@@ -99,7 +99,7 @@ async function doSetupNLS(): Promise<INLSConfiguration | undefined> {
 			}
 		}
 
-		// Fallback to the default message file to ensure english translation at least
+		// 回退到默认消息文件以确保至少有英文翻译
 		if (nlsConfig?.defaultMessagesFile && nlsConfig.defaultMessagesFile !== messagesFile) {
 			try {
 				globalThis._VSCODE_NLS_MESSAGES = JSON.parse((await fs.promises.readFile(nlsConfig.defaultMessagesFile)).toString());

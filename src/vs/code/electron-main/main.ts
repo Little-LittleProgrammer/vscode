@@ -2,7 +2,15 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-
+/**
+ * electron-main/main 是程序真正启动的入口,进入main process初始化流程
+ * 负责启动 VS Code 应用程序的主进程，并初始化所有必要的服务和组件。
+ * 主要任务：
+ * 1. 初始化服务
+ * 2. 启动主实例
+ * 3. 处理错误
+ * 4. 退出应用程序
+ */
 import '../../platform/update/common/update.config.contribution.js';
 
 import { app, dialog } from 'electron';
@@ -74,12 +82,11 @@ import { FileUserDataProvider } from '../../platform/userData/common/fileUserDat
 import { addUNCHostToAllowlist, getUNCHost } from '../../base/node/unc.js';
 
 /**
- * The main VS Code entry point.
+ * VS Code 的主入口点。
  *
- * Note: This class can exist more than once for example when VS Code is already
- * running and a second instance is started from the command line. It will always
- * try to communicate with an existing instance to prevent that 2 VS Code instances
- * are running at the same time.
+ * 注意：这个类可以存在多个实例，例如当 VS Code 已经在运行时，
+ * 从命令行启动第二个实例。它总是会尝试与现有实例通信，
+ * 以防止同时运行两个 VS Code 实例。
  */
 class CodeMain {
 
@@ -94,54 +101,65 @@ class CodeMain {
 
 	private async startup(): Promise<void> {
 
-		// Set the error handler early enough so that we are not getting the
-		// default electron error dialog popping up
+		// 尽早设置错误处理程序，这样我们就不会弹出
+		// 默认的 electron 错误对话框
 		setUnexpectedErrorHandler(err => console.error(err));
 
-		// Create services
+		// 创建服务
+		/**
+		 * 【instantiationService】 实例化服务，负责创建和管理所有服务实例
+		 * 【instanceEnvironment】 实例环境，包含当前启动目录，日志目录，操作系统信息，配置文件目录，用户目录等
+		 * 【environmentMainService】 环境服务，负责处理命令行参数和环境变量
+		 * 【configurationService】 配置服务，负责管理用户配置文件
+		 * 【stateMainService】 状态服务，负责管理应用程序状态
+		 * 【bufferLogger】 缓冲日志，负责缓冲日志
+		 * 【productService】 产品服务，负责提供产品相关的配置信息
+		 * 【userDataProfilesMainService】 用户数据配置文件服务，负责管理用户数据配置文件
+		 */
 		const [instantiationService, instanceEnvironment, environmentMainService, configurationService, stateMainService, bufferLogger, productService, userDataProfilesMainService] = this.createServices();
 
 		try {
 
-			// Init services
+			// 初始化服务
 			try {
 				await this.initServices(environmentMainService, userDataProfilesMainService, configurationService, stateMainService, productService);
 			} catch (error) {
 
-				// Show a dialog for errors that can be resolved by the user
+				// 对用户可以解决的错误显示一个对话框
 				this.handleStartupDataDirError(environmentMainService, productService, error);
 
 				throw error;
 			}
 
-			// Startup
+			// 启动主实例
 			await instantiationService.invokeFunction(async accessor => {
-				const logService = accessor.get(ILogService);
-				const lifecycleMainService = accessor.get(ILifecycleMainService);
-				const fileService = accessor.get(IFileService);
-				const loggerService = accessor.get(ILoggerService);
+				const logService = accessor.get(ILogService); // 获取日志服务，管理日志系统的基础配置和生命周期
+				const lifecycleMainService = accessor.get(ILifecycleMainService); // 获取生命周期服务
+				const fileService = accessor.get(IFileService); // 获取文件服务
+				const loggerService = accessor.get(ILoggerService); // 获取日志服务，管理和提供特定上下文或用途的日志记录器 (ILogger) 实例
 
-				// Create the main IPC server by trying to be the server
-				// If this throws an error it means we are not the first
-				// instance of VS Code running and so we would quit.
+				// 通过尝试成为服务器来创建主 IPC 服务器
+				// 如果这引发错误，则意味着我们不是第一个
+				// 运行的 VS Code 实例，因此我们将退出。
 				const mainProcessNodeIpcServer = await this.claimInstance(logService, environmentMainService, lifecycleMainService, instantiationService, productService, true);
 
-				// Write a lockfile to indicate an instance is running
+				// 写入一个锁文件以指示实例正在运行
 				// (https://github.com/microsoft/vscode/issues/127861#issuecomment-877417451)
 				FSPromises.writeFile(environmentMainService.mainLockfile, String(process.pid)).catch(err => {
-					logService.warn(`app#startup(): Error writing main lockfile: ${err.stack}`);
+					logService.warn(`app#startup(): 写入主锁文件时出错: ${err.stack}`);
 				});
 
-				// Delay creation of spdlog for perf reasons (https://github.com/microsoft/vscode/issues/72906)
+				// 出于性能原因延迟创建 spdlog (https://github.com/microsoft/vscode/issues/72906)
 				bufferLogger.logger = loggerService.createLogger('main', { name: localize('mainLog', "Main") });
 
-				// Lifecycle
+				// 生命周期
 				Event.once(lifecycleMainService.onWillShutdown)(evt => {
 					fileService.dispose();
 					configurationService.dispose();
-					evt.join('instanceLockfile', promises.unlink(environmentMainService.mainLockfile).catch(() => { /* ignored */ }));
+					evt.join('instanceLockfile', promises.unlink(environmentMainService.mainLockfile).catch(() => { /* 忽略 */ }));
 				});
 
+				// 创建主实例， 进入 vs/code/electron-main/app.ts 的 startup 方法
 				return instantiationService.createInstance(CodeApplication, mainProcessNodeIpcServer, instanceEnvironment).startup();
 			});
 		} catch (error) {
@@ -149,55 +167,69 @@ class CodeMain {
 		}
 	}
 
+
+	/**
+	 * 创建并初始化VS Code主进程所需的核心服务
+	 *
+	 * 此方法负责创建和配置VS Code电子主进程所需的基础服务，包括：
+	 * - 产品服务：提供产品相关的配置信息
+	 * - 环境服务：处理命令行参数和环境变量
+	 * - 日志服务：提供应用程序日志记录功能
+	 * - 文件服务：处理文件系统操作
+	 * - 状态服务：管理应用程序状态
+	 * - 用户数据配置文件服务：管理用户数据和配置
+	 *
+	 * @returns 返回一个包含所有创建的核心服务的元组，这些服务将被用于应用程序的后续初始化和运行
+	 */
 	private createServices(): [IInstantiationService, IProcessEnvironment, IEnvironmentMainService, ConfigurationService, StateService, BufferLogger, IProductService, UserDataProfilesMainService] {
 		const services = new ServiceCollection();
 		const disposables = new DisposableStore();
 		process.once('exit', () => disposables.dispose());
 
-		// Product
+		// 产品
 		const productService = { _serviceBrand: undefined, ...product };
 		services.set(IProductService, productService);
 
-		// Environment
+		// 环境服务：通过这个服务获取当前启动目录，日志目录，操作系统信息，配置文件目录，用户目录等
 		const environmentMainService = new EnvironmentMainService(this.resolveArgs(), productService);
-		const instanceEnvironment = this.patchEnvironment(environmentMainService); // Patch `process.env` with the instance's environment
+		const instanceEnvironment = this.patchEnvironment(environmentMainService); // 使用实例的环境修补 `process.env`
 		services.set(IEnvironmentMainService, environmentMainService);
 
-		// Logger
+		// 日志记录器 ：默认使用控制台日志ConsoleLogMainService 其中包含性能追踪和释放信息，日志输出级别
 		const loggerService = new LoggerMainService(getLogLevel(environmentMainService), environmentMainService.logsHome);
 		services.set(ILoggerMainService, loggerService);
 
-		// Log: We need to buffer the spdlog logs until we are sure
-		// we are the only instance running, otherwise we'll have concurrent
-		// log file access on Windows (https://github.com/microsoft/vscode/issues/41218)
+		// 日志：我们需要缓冲 spdlog 日志，直到我们确定
+		// 我们是唯一运行的实例，否则在 Windows 上会出现并发
+		// 日志文件访问（https://github.com/microsoft/vscode/issues/41218）
 		const bufferLogger = new BufferLogger(loggerService.getLogLevel());
 		const logService = disposables.add(new LogService(bufferLogger, [new ConsoleMainLogger(loggerService.getLogLevel())]));
 		services.set(ILogService, logService);
 
-		// Files
+		// 文件
 		const fileService = new FileService(logService);
 		services.set(IFileService, fileService);
 		const diskFileSystemProvider = new DiskFileSystemProvider(logService);
 		fileService.registerProvider(Schemas.file, diskFileSystemProvider);
 
-		// URI Identity
+		// URI 标识
 		const uriIdentityService = new UriIdentityService(fileService);
 		services.set(IUriIdentityService, uriIdentityService);
 
-		// State
+		// 状态
 		const stateService = new StateService(SaveStrategy.DELAYED, environmentMainService, logService, fileService);
 		services.set(IStateReadService, stateService);
 		services.set(IStateService, stateService);
 
-		// User Data Profiles
+		// 用户数据配置文件
 		const userDataProfilesMainService = new UserDataProfilesMainService(stateService, uriIdentityService, environmentMainService, fileService, logService);
 		services.set(IUserDataProfilesMainService, userDataProfilesMainService);
 
-		// Use FileUserDataProvider for user data to
-		// enable atomic read / write operations.
+		// 对用户数据使用 FileUserDataProvider
+		// 以启用原子读/写操作。
 		fileService.registerProvider(Schemas.vscodeUserData, new FileUserDataProvider(Schemas.file, diskFileSystemProvider, Schemas.vscodeUserData, userDataProfilesMainService, uriIdentityService, logService));
 
-		// Policy
+		// 策略
 		let policyService: IPolicyService | undefined;
 		if (isWindows && productService.win32RegValueName) {
 			policyService = disposables.add(new NativePolicyService(logService, productService.win32RegValueName));
@@ -210,26 +242,26 @@ class CodeMain {
 		}
 		services.set(IPolicyService, policyService);
 
-		// Configuration
+		// 配置
 		const configurationService = new ConfigurationService(userDataProfilesMainService.defaultProfile.settingsResource, fileService, policyService, logService);
 		services.set(IConfigurationService, configurationService);
 
-		// Lifecycle
+		// 生命周期
 		services.set(ILifecycleMainService, new SyncDescriptor(LifecycleMainService, undefined, false));
 
-		// Request
+		// 请求
 		services.set(IRequestService, new SyncDescriptor(RequestService, undefined, true));
 
-		// Themes
+		// 主题
 		services.set(IThemeMainService, new SyncDescriptor(ThemeMainService));
 
-		// Signing
-		services.set(ISignService, new SyncDescriptor(SignService, undefined, false /* proxied to other processes */));
+		// 签名
+		services.set(ISignService, new SyncDescriptor(SignService, undefined, false /* 代理到其他进程 */));
 
-		// Tunnel
+		// 隧道
 		services.set(ITunnelService, new SyncDescriptor(TunnelService));
 
-		// Protocol (instantiated early and not using sync descriptor for security reasons)
+		// 协议（出于安全原因，早期实例化且不使用同步描述符）
 		services.set(IProtocolMainService, new ProtocolMainService(environmentMainService, userDataProfilesMainService, logService));
 
 		return [new InstantiationService(services, true), instanceEnvironment, environmentMainService, configurationService, stateService, bufferLogger, productService, userDataProfilesMainService];
@@ -252,28 +284,45 @@ class CodeMain {
 		return instanceEnvironment;
 	}
 
+	/**
+	 * 初始化服务
+	 *
+	 * 此方法负责初始化 VS Code 主进程所需的核心服务，包括：
+	 * - 环境服务：处理命令行参数和环境变量
+	 * - 用户数据配置文件服务：管理用户数据和配置
+	 * - 配置服务：管理用户配置文件
+	 * - 状态服务：管理应用程序状态
+	 * - 产品服务：提供产品相关的配置信息
+	 *
+	 * @param environmentMainService 环境服务
+	 * @param userDataProfilesMainService 用户数据配置文件服务
+	 * @param configurationService 配置服务
+	 * @param stateService 状态服务
+	 * @param productService 产品服务
+	 */
 	private async initServices(environmentMainService: IEnvironmentMainService, userDataProfilesMainService: UserDataProfilesMainService, configurationService: ConfigurationService, stateService: StateService, productService: IProductService): Promise<void> {
+		// 使用 Promises.settled 方法并行执行多个异步操作，并等待所有操作完成（无论成功或失败）这比 Promise.all 更安全，因为即使某些操作失败，也会继续执行其他操作
 		await Promises.settled<unknown>([
 
-			// Environment service (paths)
+			// 环境服务（路径），
 			Promise.all<string | undefined>([
-				this.allowWindowsUNCPath(environmentMainService.extensionsPath), // enable extension paths on UNC drives...
-				environmentMainService.codeCachePath,							 // ...other user-data-derived paths should already be enlisted from `main.js`
-				environmentMainService.logsHome.with({ scheme: Schemas.file }).fsPath,
-				userDataProfilesMainService.defaultProfile.globalStorageHome.with({ scheme: Schemas.file }).fsPath,
-				environmentMainService.workspaceStorageHome.with({ scheme: Schemas.file }).fsPath,
-				environmentMainService.localHistoryHome.with({ scheme: Schemas.file }).fsPath,
-				environmentMainService.backupHome
+				this.allowWindowsUNCPath(environmentMainService.extensionsPath), // 在 UNC驱动器上启用扩展路径，确保Windows网络路径可访问
+				environmentMainService.codeCachePath,                           // 代码缓存路径，用于存储编译后的代码和缓存数据
+				environmentMainService.logsHome.with({ scheme: Schemas.file }).fsPath, // 日志文件存储目录，用于存储应用程序运行日志
+				userDataProfilesMainService.defaultProfile.globalStorageHome.with({ scheme: Schemas.file }).fsPath, // 默认用户配置文件的全局存储目录，存储扩展的全局数据
+				environmentMainService.workspaceStorageHome.with({ scheme: Schemas.file }).fsPath, // 工作区存储目录，用于存储特定工作区的数据
+				environmentMainService.localHistoryHome.with({ scheme: Schemas.file }).fsPath, // 本地历史记录目录，用于存储文件的本地历史版本
+				environmentMainService.backupHome                               // 备份目录，用于存储未保存内容的备份，防止意外关闭导致数据丢失
 			].map(path => path ? promises.mkdir(path, { recursive: true }) : undefined)),
 
-			// State service
+			// 状态服务
 			stateService.init(),
 
-			// Configuration service
+			// 配置服务
 			configurationService.initialize()
 		]);
 
-		// Initialize user data profiles after initializing the state
+		// 在初始化状态后初始化用户数据配置文件
 		userDataProfilesMainService.init();
 	}
 
@@ -290,40 +339,40 @@ class CodeMain {
 
 	private async claimInstance(logService: ILogService, environmentMainService: IEnvironmentMainService, lifecycleMainService: ILifecycleMainService, instantiationService: IInstantiationService, productService: IProductService, retry: boolean): Promise<NodeIPCServer> {
 
-		// Try to setup a server for running. If that succeeds it means
-		// we are the first instance to startup. Otherwise it is likely
-		// that another instance is already running.
-		let mainProcessNodeIpcServer: NodeIPCServer;
+		// 尝试设置一个运行服务器。如果成功，则意味着
+		// 我们是第一个启动的实例。否则，很可能
+		// 另一个实例已经在运行。
+		let mainProcessNodeIpcServer: NodeIPCServer; // 进程间通信服务
 		try {
 			mark('code/willStartMainServer');
-			mainProcessNodeIpcServer = await nodeIPCServe(environmentMainService.mainIPCHandle);
+			mainProcessNodeIpcServer = await nodeIPCServe(environmentMainService.mainIPCHandle); // 创建服务端 ipc 服务（IPC 通常指 Inter-Process Communication，即进程间通信）
 			mark('code/didStartMainServer');
 			Event.once(lifecycleMainService.onWillShutdown)(() => mainProcessNodeIpcServer.dispose());
 		} catch (error) {
 
-			// Handle unexpected errors (the only expected error is EADDRINUSE that
-			// indicates another instance of VS Code is running)
+			// 处理意外错误（唯一预期的错误是 EADDRINUSE，
+			// 表明另一个 VS Code 实例正在运行）
 			if (error.code !== 'EADDRINUSE') {
 
-				// Show a dialog for errors that can be resolved by the user
+				// 对用户可以解决的错误显示一个对话框
 				this.handleStartupDataDirError(environmentMainService, productService, error);
 
-				// Any other runtime error is just printed to the console
+				// 任何其他运行时错误都只打印到控制台
 				throw error;
 			}
 
-			// there's a running instance, let's connect to it
+			// 有一个正在运行的实例，让我们连接到它
 			let client: NodeIPCClient<string>;
 			try {
 				client = await nodeIPCConnect(environmentMainService.mainIPCHandle, 'main');
 			} catch (error) {
 
-				// Handle unexpected connection errors by showing a dialog to the user
+				// 通过向用户显示对话框来处理意外的连接错误
 				if (!retry || isWindows || error.code !== 'ECONNREFUSED') {
 					if (error.code === 'EPERM') {
 						this.showStartupWarningDialog(
-							localize('secondInstanceAdmin', "Another instance of {0} is already running as administrator.", productService.nameShort),
-							localize('secondInstanceAdminDetail', "Please close the other instance and try again."),
+							localize('secondInstanceAdmin', "{0} 的另一个实例已作为管理员运行。", productService.nameShort),
+							localize('secondInstanceAdminDetail', "请关闭其他实例并重试。"),
 							productService
 						);
 					}
@@ -331,13 +380,13 @@ class CodeMain {
 					throw error;
 				}
 
-				// it happens on Linux and OS X that the pipe is left behind
-				// let's delete it, since we can't connect to it and then
-				// retry the whole thing
+				// 在 Linux 和 OS X 上，可能会留下管道文件
+				// 让我们删除它，因为我们无法连接到它，然后
+				// 重试整个过程
 				try {
 					unlinkSync(environmentMainService.mainIPCHandle);
 				} catch (error) {
-					logService.warn('Could not delete obsolete instance handle', error);
+					logService.warn('无法删除过时的实例句柄', error);
 
 					throw error;
 				}
@@ -345,24 +394,24 @@ class CodeMain {
 				return this.claimInstance(logService, environmentMainService, lifecycleMainService, instantiationService, productService, false);
 			}
 
-			// Tests from CLI require to be the only instance currently
+			// 来自 CLI 的测试要求当前是唯一的实例
 			if (environmentMainService.extensionTestsLocationURI && !environmentMainService.debugExtensionHost.break) {
-				const msg = `Running extension tests from the command line is currently only supported if no other instance of ${productService.nameShort} is running.`;
+				const msg = `当前仅在没有其他 ${productService.nameShort} 实例运行时才支持从命令行运行扩展测试。`;
 				logService.error(msg);
 				client.dispose();
 
 				throw new Error(msg);
 			}
 
-			// Show a warning dialog after some timeout if it takes long to talk to the other instance
-			// Skip this if we are running with --wait where it is expected that we wait for a while.
-			// Also skip when gathering diagnostics (--status) which can take a longer time.
+			// 如果与另一个实例通信花费很长时间，则在超时后显示警告对话框
+			// 如果我们使用 --wait 运行，则跳过此步骤，因为在这种情况下，预计会等待一段时间。
+			// 在收集诊断信息（--status）时也跳过此步骤，这可能需要更长的时间。
 			let startupWarningDialogHandle: NodeJS.Timeout | undefined = undefined;
 			if (!environmentMainService.args.wait && !environmentMainService.args.status) {
 				startupWarningDialogHandle = setTimeout(() => {
 					this.showStartupWarningDialog(
-						localize('secondInstanceNoResponse', "Another instance of {0} is running but not responding", productService.nameShort),
-						localize('secondInstanceNoResponseDetail', "Please close all other instances and try again."),
+						localize('secondInstanceNoResponse', "{0} 的另一个实例正在运行但没有响应", productService.nameShort),
+						localize('secondInstanceNoResponseDetail', "请关闭所有其他实例并重试。"),
 						productService
 					);
 				}, 10000);
@@ -371,7 +420,7 @@ class CodeMain {
 			const otherInstanceLaunchMainService = ProxyChannel.toService<ILaunchMainService>(client.getChannel('launch'), { disableMarshalling: true });
 			const otherInstanceDiagnosticsMainService = ProxyChannel.toService<IDiagnosticsMainService>(client.getChannel('diagnostics'), { disableMarshalling: true });
 
-			// Process Info
+			// 进程信息
 			if (environmentMainService.args.status) {
 				return instantiationService.invokeFunction(async () => {
 					const diagnosticsService = new DiagnosticsService(NullTelemetryService, productService);
@@ -384,35 +433,35 @@ class CodeMain {
 				});
 			}
 
-			// Windows: allow to set foreground
+			// Windows：允许设置前台
 			if (isWindows) {
 				await this.windowsAllowSetForegroundWindow(otherInstanceLaunchMainService, logService);
 			}
 
-			// Send environment over...
-			logService.trace('Sending env to running instance...');
+			// 发送环境信息...
+			logService.trace('将环境发送到正在运行的实例...');
 			await otherInstanceLaunchMainService.start(environmentMainService.args, process.env as IProcessEnvironment);
 
-			// Cleanup
+			// 清理
 			client.dispose();
 
-			// Now that we started, make sure the warning dialog is prevented
+			// 既然我们已经启动了，请确保阻止警告对话框
 			if (startupWarningDialogHandle) {
 				clearTimeout(startupWarningDialogHandle);
 			}
 
-			throw new ExpectedError('Sent env to running instance. Terminating...');
+			throw new ExpectedError('已将环境发送到正在运行的实例。正在终止...');
 		}
 
-		// Print --status usage info
+		// 打印 --status 使用信息
 		if (environmentMainService.args.status) {
-			console.log(localize('statusWarning', "Warning: The --status argument can only be used if {0} is already running. Please run it again after {0} has started.", productService.nameShort));
+			console.log(localize('statusWarning', "警告：--status 参数只能在 {0} 已经在运行时使用。请在 {0} 启动后再次运行它。", productService.nameShort));
 
-			throw new ExpectedError('Terminating...');
+			throw new ExpectedError('正在终止...');
 		}
 
-		// Set the VSCODE_PID variable here when we are sure we are the first
-		// instance to startup. Otherwise we would wrongly overwrite the PID
+		// 当我们确定我们是第一个启动的实例时，在这里设置 VSCODE_PID 变量。
+		// 否则，我们会错误地覆盖 PID
 		process.env['VSCODE_PID'] = String(process.pid);
 
 		return mainProcessNodeIpcServer;
@@ -432,13 +481,13 @@ class CodeMain {
 
 	private showStartupWarningDialog(message: string, detail: string, productService: IProductService): void {
 
-		// use sync variant here because we likely exit after this method
-		// due to startup issues and otherwise the dialog seems to disappear
+		// 在这里使用同步变体，因为我们很可能在此方法之后退出
+		// 由于启动问题，否则对话框似乎会消失
 		// https://github.com/microsoft/vscode/issues/104493
 
 		dialog.showMessageBoxSync(massageMessageBoxOptions({
 			type: 'warning',
-			buttons: [localize({ key: 'close', comment: ['&& denotes a mnemonic'] }, "&&Close")],
+			buttons: [localize({ key: 'close', comment: ['&& 表示助记符'] }, "&&关闭")],
 			message,
 			detail
 		}, productService).options);
@@ -470,12 +519,12 @@ class CodeMain {
 					logService.trace(reason.message);
 				}
 			} else {
-				exitCode = 1; // signal error to the outside
+				exitCode = 1; // 向外部发出错误信号
 
 				if (reason.stack) {
 					logService.error(reason.stack);
 				} else {
-					logService.error(`Startup error: ${reason.toString()}`);
+					logService.error(`启动错误: ${reason.toString()}`);
 				}
 			}
 		}
@@ -483,20 +532,20 @@ class CodeMain {
 		lifecycleMainService.kill(exitCode);
 	}
 
-	//#region Command line arguments utilities
+	//#region 命令行参数工具
 
 	private resolveArgs(): NativeParsedArgs {
 
-		// Parse arguments
+		// 解析参数
 		const args = this.validatePaths(parseMainProcessArgv(process.argv));
 
-		// If we are started with --wait create a random temporary file
-		// and pass it over to the starting instance. We can use this file
-		// to wait for it to be deleted to monitor that the edited file
-		// is closed and then exit the waiting process.
+		// 如果我们使用 --wait 启动，则创建一个随机临时文件
+		// 并将其传递给启动实例。我们可以使用此文件
+		// 等待它被删除，以监视编辑的文件
+		// 是否已关闭，然后退出等待进程。
 		//
-		// Note: we are not doing this if the wait marker has been already
-		// added as argument. This can happen if VS Code was started from CLI.
+		// 注意：如果等待标记已经作为参数添加，我们不会这样做。
+		// 这可能发生在 VS Code 从 CLI 启动的情况下。
 
 		if (args.wait && !args.waitMarkerFilePath) {
 			const waitMarkerFilePath = createWaitMarkerFileSync(args.verbose);
@@ -511,13 +560,13 @@ class CodeMain {
 
 	private validatePaths(args: NativeParsedArgs): NativeParsedArgs {
 
-		// Track URLs if they're going to be used
+		// 如果要使用 URL，则跟踪它们
 		if (args['open-url']) {
 			args._urls = args._;
 			args._ = [];
 		}
 
-		// Normalize paths and watch out for goto line mode
+		// 规范化路径并注意跳转到行模式
 		if (!args['remote']) {
 			const paths = this.doValidatePaths(args._, args.goto);
 			args._ = paths;
@@ -544,8 +593,8 @@ class CodeMain {
 			const sanitizedFilePath = sanitizeFilePath(pathCandidate, currentWorkingDir);
 
 			const filePathBasename = basename(sanitizedFilePath);
-			if (filePathBasename /* can be empty if code is opened on root */ && !isValidBasename(filePathBasename)) {
-				return null; // do not allow invalid file names
+			if (filePathBasename /* 如果在根目录打开代码，则可能为空 */ && !isValidBasename(filePathBasename)) {
+				return null; // 不允许无效的文件名
 			}
 
 			if (gotoLineMode && parsedPath) {
@@ -565,20 +614,20 @@ class CodeMain {
 
 	private preparePath(cwd: string, path: string): string {
 
-		// Trim trailing quotes
+		// 修剪尾随引号
 		if (isWindows) {
 			path = rtrim(path, '"'); // https://github.com/microsoft/vscode/issues/1498
 		}
 
-		// Trim whitespaces
-		path = trim(trim(path, ' '), '\t');
+		// 修剪空白字符
+		path = trim(trim(path, ' '), '	');
 
 		if (isWindows) {
 
-			// Resolve the path against cwd if it is relative
+			// 如果是相对路径，则根据 cwd 解析路径
 			path = resolve(cwd, path);
 
-			// Trim trailing '.' chars on Windows to prevent invalid file names
+			// 在 Windows 上修剪尾随的 '.' 字符以防止无效的文件名
 			path = rtrim(path, '.');
 		}
 
@@ -602,6 +651,6 @@ class CodeMain {
 	//#endregion
 }
 
-// Main Startup
+// 主启动
 const code = new CodeMain();
 code.main();

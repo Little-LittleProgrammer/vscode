@@ -143,6 +143,7 @@ if (process.platform === 'win32' || process.platform === 'linux') {
 
 // 在准备就绪后加载我们的代码
 app.once('ready', function () {
+	// 如果指定了 trace 参数，则开始跟踪， 性能分析
 	if (args['trace']) {
 		let traceOptions: Electron.TraceConfig | Electron.TraceCategoriesAndOptions;
 		if (args['trace-memory-infra']) {
@@ -176,17 +177,18 @@ app.once('ready', function () {
 
 		contentTracing.startRecording(traceOptions).finally(() => onReady());
 	} else {
+		// 初始入口
 		onReady();
 	}
 });
 
 async function onReady() {
-	perf.mark('code/mainAppReady');
+	perf.mark('code/mainAppReady'); // 记录主应用准备就绪的时间点
 
 	try {
 		const [, nlsConfig] = await Promise.all([
-			mkdirpIgnoreError(codeCachePath),
-			resolveNlsConfiguration()
+			mkdirpIgnoreError(codeCachePath), // 创建代码缓存目录
+			resolveNlsConfiguration() // 解析 NLS 配置
 		]);
 
 		await startup(codeCachePath, nlsConfig);
@@ -202,7 +204,7 @@ async function startup(codeCachePath: string | undefined, nlsConfig: INLSConfigu
 	process.env['VSCODE_NLS_CONFIG'] = JSON.stringify(nlsConfig);
 	process.env['VSCODE_CODE_CACHE_PATH'] = codeCachePath || '';
 
-	// 引导 ESM
+	// 引导 ESM（ECMAScript 模块）加载系统，这个函数在 bootstrap-esm.ts 文件中定义，它负责设置 NLS（原生语言支持）配置，读取语言包文件，并将相关配置存储在全局变量中，以便后续模块使用，这是应用程序启动过程中的关键步骤，确保国际化和本地化功能正常工作
 	await bootstrapESM();
 
 	// 加载 Main
@@ -613,6 +615,7 @@ function getCodeCachePath(): string | undefined {
 	return path.join(userDataPath, 'CachedData', commit);
 }
 
+// 创建目录，如果目录不存在，则创建目录，忽略报错
 async function mkdirpIgnoreError(dir: string | undefined): Promise<string | undefined> {
 	if (typeof dir === 'string') {
 		try {
@@ -652,7 +655,8 @@ function processZhLocale(appLocale: string): string {
 }
 
 /**
- * 解析 NLS 配置
+ * 解析 NLS 配置（NLS - 原生语言支持，用于应用程序的国际化和本地化，
+ * 允许应用程序根据用户的语言偏好显示相应的翻译文本）
  */
 async function resolveNlsConfiguration(): Promise<INLSConfiguration> {
 
@@ -671,9 +675,9 @@ async function resolveNlsConfiguration(): Promise<INLSConfiguration> {
 	let userLocale = app.getLocale();
 	if (!userLocale) {
 		return {
-			userLocale: 'en',
+			userLocale: 'en', // 默认语言
 			osLocale,
-			resolvedLanguage: 'en',
+			resolvedLanguage: 'en', // 默认语言
 			defaultMessagesFile: path.join(__dirname, 'nls.messages.json'),
 
 			// NLS: 下面 2 项是旧时代的遗留物，仅由 vscode-nls 使用并已弃用

@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *  Copyright (c) Microsoft Corporation. 保留所有权利。
+ *  根据 MIT 许可证授权。有关详细信息，请参阅项目根目录中的 License.txt。
  *--------------------------------------------------------------------------------------------*/
 
 import * as nls from '../../../nls.js';
@@ -52,7 +52,7 @@ export interface ILogger extends IDisposable {
 	error(message: string | Error, ...args: any[]): void;
 
 	/**
-	 * An operation to flush the contents. Can be synchronous.
+	 * 刷新内容的操作。可以是同步的。
 	 */
 	flush(): void;
 }
@@ -107,47 +107,47 @@ export interface ILogService extends ILogger {
 export interface ILoggerOptions {
 
 	/**
-	 * Id of the logger.
+	 * 日志记录器的 ID。
 	 */
 	id?: string;
 
 	/**
-	 * Name of the logger.
+	 * 日志记录器的名称。
 	 */
 	name?: string;
 
 	/**
-	 * Do not create rotating files if max size exceeds.
+	 * 如果超过最大大小，则不创建轮换文件。
 	 */
 	donotRotate?: boolean;
 
 	/**
-	 * Do not use formatters.
+	 * 不使用格式化程序。
 	 */
 	donotUseFormatters?: boolean;
 
 	/**
-	 * When to log. Set to `always` to log always.
+	 * 何时记录。设置为 `always` 以始终记录。
 	 */
 	logLevel?: 'always' | LogLevel;
 
 	/**
-	 * Whether the log should be hidden from the user.
+	 * 日志是否应对用户隐藏。
 	 */
 	hidden?: boolean;
 
 	/**
-	 * Condition which must be true to show this logger
+	 * 显示此日志记录器必须为 true 的条件
 	 */
 	when?: string;
 
 	/**
-	 * Id of the extension that created this logger.
+	 * 创建此日志记录器的扩展的 ID。
 	 */
 	extensionId?: string;
 
 	/**
-	 * Group of the logger.
+	 * 日志记录器的组。
 	 */
 	group?: LoggerGroup;
 }
@@ -173,82 +173,82 @@ export interface ILoggerService {
 	readonly _serviceBrand: undefined;
 
 	/**
-	 * Creates a logger for the given resource, or gets one if it already exists.
+	 * 为给定资源创建日志记录器，如果已存在则获取一个。
 	 *
-	 * This will also register the logger with the logger service.
+	 * 这也会将日志记录器注册到日志记录器服务中。
 	 */
 	createLogger(resource: URI, options?: ILoggerOptions): ILogger;
 
 	/**
-	 * Creates a logger with the given id in the logs folder, or gets one if it already exists.
+	 * 在 logs 文件夹中创建具有给定 ID 的日志记录器，如果已存在则获取一个。
 	 *
-	 * This will also register the logger with the logger service.
+	 * 这也会将日志记录器注册到日志记录器服务中。
 	 */
 	createLogger(id: string, options?: Omit<ILoggerOptions, 'id'>): ILogger;
 
 	/**
-	 * Gets an existing logger, if any.
+	 * 获取现有日志记录器（如果存在）。
 	 */
 	getLogger(resourceOrId: URI | string): ILogger | undefined;
 
 	/**
-	 * An event which fires when the log level of a logger has changed
+	 * 当日志记录器的日志级别更改时触发的事件
 	 */
 	readonly onDidChangeLogLevel: Event<LogLevel | [URI, LogLevel]>;
 
 	/**
-	 * Set default log level.
+	 * 设置默认日志级别。
 	 */
 	setLogLevel(level: LogLevel): void;
 
 	/**
-	 * Set log level for a logger.
+	 * 设置日志记录器的日志级别。
 	 */
 	setLogLevel(resource: URI, level: LogLevel): void;
 
 	/**
-	 * Get log level for a logger or the default log level.
+	 * 获取日志记录器的日志级别或默认日志级别。
 	 */
 	getLogLevel(resource?: URI): LogLevel;
 
 	/**
-	 * An event which fires when the visibility of a logger has changed
+	 * 当日志记录器的可见性更改时触发的事件
 	 */
 	readonly onDidChangeVisibility: Event<[URI, boolean]>;
 
 	/**
-	 * Set the visibility of a logger.
+	 * 设置日志记录器的可见性。
 	 */
 	setVisibility(resourceOrId: URI | string, visible: boolean): void;
 
 	/**
-	 * An event which fires when the logger resources are changed
+	 * 当日志记录器资源更改时触发的事件
 	 */
 	readonly onDidChangeLoggers: Event<DidChangeLoggersEvent>;
 
 	/**
-	 * Register a logger with the logger service.
+	 * 向日志记录器服务注册日志记录器。
 	 *
-	 * Note that this will not create a logger, but only register it.
+	 * 请注意，这不会创建日志记录器，只会注册它。
 	 *
-	 * Use `createLogger` to create a logger and register it.
+	 * 使用 `createLogger` 创建日志记录器并注册它。
 	 *
-	 * Use it when you want to register a logger that is not created by the logger service.
+	 * 当您想要注册不是由日志记录器服务创建的日志记录器时使用它。
 	 */
 	registerLogger(resource: ILoggerResource): void;
 
 	/**
-	 * Deregister the logger for the given resource.
+	 * 注销给定资源的日志记录器。
 	 */
 	deregisterLogger(idOrResource: URI | string): void;
 
 	/**
-	 * Get all registered loggers
+	 * 获取所有已注册的日志记录器
 	 */
 	getRegisteredLoggers(): Iterable<ILoggerResource>;
 
 	/**
-	 * Get the registered logger for the given resource.
+	 * 获取给定资源的已注册日志记录器。
 	 */
 	getRegisteredLogger(resource: URI): ILoggerResource | undefined;
 }
@@ -643,7 +643,6 @@ export abstract class AbstractLoggerService extends Disposable implements ILogge
 			}
 		};
 		this.registerLogger(loggerEntry.info);
-		// TODO: @sandy081 Remove this once registerLogger can take ILogger
 		this._loggers.set(resource, loggerEntry);
 		return logger;
 	}

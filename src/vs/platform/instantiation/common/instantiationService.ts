@@ -3,6 +3,9 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+/**
+ * 【instantiationService】 实例化服务，负责创建和管理所有服务实例
+ */
 import { GlobalIdleValue } from '../../../base/common/async.js';
 import { Event } from '../../../base/common/event.js';
 import { illegalState } from '../../../base/common/errors.js';
@@ -36,6 +39,13 @@ export class InstantiationService implements IInstantiationService {
 	private readonly _servicesToMaybeDispose = new Set<any>();
 	private readonly _children = new Set<InstantiationService>();
 
+	/**
+	 * 构造函数，初始化实例化服务。
+	 * @param _services 服务集合，默认为新的空集合。
+	 * @param _strict 是否启用严格模式，默认为 false。
+	 * @param _parent 父实例化服务，可选。
+	 * @param _enableTracing 是否启用跟踪，默认为全局跟踪设置。
+	 */
 	constructor(
 		private readonly _services: ServiceCollection = new ServiceCollection(),
 		private readonly _strict: boolean = false,
@@ -47,6 +57,9 @@ export class InstantiationService implements IInstantiationService {
 		this._globalGraph = _enableTracing ? _parent?._globalGraph ?? new Graph(e => e) : undefined;
 	}
 
+	/**
+	 * 销毁此实例化服务实例及其创建的服务和子服务。
+	 */
 	dispose(): void {
 		if (!this._isDisposed) {
 			this._isDisposed = true;
@@ -64,12 +77,21 @@ export class InstantiationService implements IInstantiationService {
 		}
 	}
 
+	/**
+	 * 如果服务已被销毁，则抛出错误。
+	 */
 	private _throwIfDisposed(): void {
 		if (this._isDisposed) {
 			throw new Error('InstantiationService has been disposed');
 		}
 	}
 
+	/**
+	 * 创建一个子实例化服务。
+	 * @param services 要添加到子服务的服务集合。
+	 * @param store 可选的 DisposableStore 用于管理子服务的生命周期。
+	 * @returns 新的子实例化服务实例。
+	 */
 	createChild(services: ServiceCollection, store?: DisposableStore): IInstantiationService {
 		this._throwIfDisposed();
 
@@ -86,6 +108,12 @@ export class InstantiationService implements IInstantiationService {
 		return result;
 	}
 
+	/**
+	 * 使用服务访问器调用一个函数。
+	 * @param fn 要调用的函数，第一个参数是服务访问器。
+	 * @param args 传递给函数的其他参数。
+	 * @returns 函数的返回值。
+	 */
 	invokeFunction<R, TS extends any[] = []>(fn: (accessor: ServicesAccessor, ...args: TS) => R, ...args: TS): R {
 		this._throwIfDisposed();
 
@@ -113,6 +141,12 @@ export class InstantiationService implements IInstantiationService {
 		}
 	}
 
+	/**
+	 * 同步创建一个由描述符或构造函数指定的实例。
+	 * @param ctorOrDescriptor 构造函数或同步描述符。
+	 * @param rest 传递给构造函数的静态参数。
+	 * @returns 创建的实例。
+	 */
 	createInstance<T>(descriptor: SyncDescriptor0<T>): T;
 	createInstance<Ctor extends new (...args: any[]) => unknown, R extends InstanceType<Ctor>>(ctor: Ctor, ...args: GetLeadingNonServiceArgs<ConstructorParameters<Ctor>>): R;
 	createInstance(ctorOrDescriptor: any | SyncDescriptor<any>, ...rest: any[]): unknown {
@@ -131,6 +165,13 @@ export class InstantiationService implements IInstantiationService {
 		return result;
 	}
 
+	/**
+	 * 内部方法，实际执行实例创建逻辑。
+	 * @param ctor 构造函数。
+	 * @param args 传递给构造函数的参数（包括静态参数和服务参数）。
+	 * @param _trace 跟踪对象。
+	 * @returns 创建的实例。
+	 */
 	private _createInstance<T>(ctor: any, args: any[] = [], _trace: Trace): T {
 
 		// arguments defined by service decorators
@@ -162,6 +203,11 @@ export class InstantiationService implements IInstantiationService {
 		return Reflect.construct<any, T>(ctor, args.concat(serviceArgs));
 	}
 
+	/**
+	 * 将已创建的服务实例设置回服务集合中（覆盖描述符）。
+	 * @param id 服务标识符。
+	 * @param instance 服务实例。
+	 */
 	private _setCreatedServiceInstance<T>(id: ServiceIdentifier<T>, instance: T): void {
 		if (this._services.get(id) instanceof SyncDescriptor) {
 			this._services.set(id, instance);
@@ -172,6 +218,11 @@ export class InstantiationService implements IInstantiationService {
 		}
 	}
 
+	/**
+	 * 获取服务实例或其描述符。会向上查找父服务。
+	 * @param id 服务标识符。
+	 * @returns 服务实例或同步描述符。
+	 */
 	private _getServiceInstanceOrDescriptor<T>(id: ServiceIdentifier<T>): T | SyncDescriptor<T> {
 		const instanceOrDesc = this._services.get(id);
 		if (!instanceOrDesc && this._parent) {
@@ -181,6 +232,12 @@ export class InstantiationService implements IInstantiationService {
 		}
 	}
 
+	/**
+	 * 获取或创建服务实例。如果服务尚未创建，则创建并缓存它。
+	 * @param id 服务标识符。
+	 * @param _trace 跟踪对象。
+	 * @returns 服务实例。
+	 */
 	protected _getOrCreateServiceInstance<T>(id: ServiceIdentifier<T>, _trace: Trace): T {
 		if (this._globalGraph && this._globalGraphImplicitDependency) {
 			this._globalGraph.insertEdge(this._globalGraphImplicitDependency, String(id));
@@ -197,6 +254,13 @@ export class InstantiationService implements IInstantiationService {
 	private readonly _activeInstantiations = new Set<ServiceIdentifier<any>>();
 
 
+	/**
+	 * 安全地创建并缓存服务实例，防止循环依赖期间的递归实例化。
+	 * @param id 服务标识符。
+	 * @param desc 同步描述符。
+	 * @param _trace 跟踪对象。
+	 * @returns 创建的服务实例。
+	 */
 	private _safeCreateAndCacheServiceInstance<T>(id: ServiceIdentifier<T>, desc: SyncDescriptor<T>, _trace: Trace): T {
 		if (this._activeInstantiations.has(id)) {
 			throw new Error(`illegal state - RECURSIVELY instantiating service '${id}'`);
@@ -209,6 +273,13 @@ export class InstantiationService implements IInstantiationService {
 		}
 	}
 
+	/**
+	 * 创建并缓存服务实例，处理依赖关系图和循环依赖检测。
+	 * @param id 服务标识符。
+	 * @param desc 同步描述符。
+	 * @param _trace 跟踪对象。
+	 * @returns 创建的服务实例。
+	 */
 	private _createAndCacheServiceInstance<T>(id: ServiceIdentifier<T>, desc: SyncDescriptor<T>, _trace: Trace): T {
 
 		type Triple = { id: ServiceIdentifier<any>; desc: SyncDescriptor<any>; _trace: Trace };
@@ -279,6 +350,15 @@ export class InstantiationService implements IInstantiationService {
 		return <T>this._getServiceInstanceOrDescriptor(id);
 	}
 
+	/**
+	 * 创建服务实例，并确定其所有者（即哪个 InstantiationService 负责管理其生命周期）。
+	 * @param id 服务标识符。
+	 * @param ctor 构造函数。
+	 * @param args 静态参数。
+	 * @param supportsDelayedInstantiation 是否支持延迟实例化。
+	 * @param _trace 跟踪对象。
+	 * @returns 创建的服务实例。
+	 */
 	private _createServiceInstanceWithOwner<T>(id: ServiceIdentifier<T>, ctor: any, args: any[] = [], supportsDelayedInstantiation: boolean, _trace: Trace): T {
 		if (this._services.get(id) instanceof SyncDescriptor) {
 			return this._createServiceInstance(id, ctor, args, supportsDelayedInstantiation, _trace, this._servicesToMaybeDispose);
@@ -289,6 +369,16 @@ export class InstantiationService implements IInstantiationService {
 		}
 	}
 
+	/**
+	 * 内部方法，创建服务实例，支持立即或延迟实例化。
+	 * @param id 服务标识符。
+	 * @param ctor 构造函数。
+	 * @param args 静态参数。
+	 * @param supportsDelayedInstantiation 是否支持延迟实例化。
+	 * @param _trace 跟踪对象。
+	 * @param disposeBucket 用于存储需要销毁的实例的集合。
+	 * @returns 创建的服务实例（可能是代理对象）。
+	 */
 	private _createServiceInstance<T>(id: ServiceIdentifier<T>, ctor: any, args: any[] = [], supportsDelayedInstantiation: boolean, _trace: Trace, disposeBucket: Set<any>): T {
 		if (!supportsDelayedInstantiation) {
 			// eager instantiation
@@ -383,6 +473,11 @@ export class InstantiationService implements IInstantiationService {
 		}
 	}
 
+	/**
+	 * 根据是否处于严格模式决定是抛出错误还是仅打印警告。
+	 * @param msg 错误或警告信息。
+	 * @param printWarning 是否打印警告。
+	 */
 	private _throwIfStrict(msg: string, printWarning: boolean): void {
 		if (printWarning) {
 			console.warn(msg);
@@ -407,15 +502,36 @@ export class Trace {
 	static all = new Set<string>();
 
 	private static readonly _None = new class extends Trace {
+		/**
+		 * Trace 类的构造函数 (空实现)。
+		 */
 		constructor() { super(TraceType.None, null); }
+		/**
+		 * 停止跟踪 (空实现)。
+		 */
 		override stop() { }
+		/**
+		 * 创建分支跟踪 (返回自身)。
+		 */
 		override branch() { return this; }
 	};
 
+	/**
+	 * 创建一个用于跟踪函数调用的 Trace 实例。
+	 * @param _enableTracing 是否启用跟踪。
+	 * @param ctor 构造函数或函数。
+	 * @returns Trace 实例或 Trace._None。
+	 */
 	static traceInvocation(_enableTracing: boolean, ctor: any): Trace {
 		return !_enableTracing ? Trace._None : new Trace(TraceType.Invocation, ctor.name || new Error().stack!.split('\n').slice(3, 4).join('\n'));
 	}
 
+	/**
+	 * 创建一个用于跟踪实例创建的 Trace 实例。
+	 * @param _enableTracing 是否启用跟踪。
+	 * @param ctor 构造函数。
+	 * @returns Trace 实例或 Trace._None。
+	 */
 	static traceCreation(_enableTracing: boolean, ctor: any): Trace {
 		return !_enableTracing ? Trace._None : new Trace(TraceType.Creation, ctor.name);
 	}
@@ -424,17 +540,31 @@ export class Trace {
 	private readonly _start: number = Date.now();
 	private readonly _dep: [ServiceIdentifier<any>, boolean, Trace?][] = [];
 
+	/**
+	 * Trace 类的私有构造函数。
+	 * @param type 跟踪类型。
+	 * @param name 跟踪名称。
+	 */
 	private constructor(
 		readonly type: TraceType,
 		readonly name: string | null
 	) { }
 
+	/**
+	 * 创建一个分支跟踪。
+	 * @param id 服务标识符。
+	 * @param first 是否是首次创建。
+	 * @returns 新的 Trace 实例（分支）。
+	 */
 	branch(id: ServiceIdentifier<any>, first: boolean): Trace {
 		const child = new Trace(TraceType.Branch, id.toString());
 		this._dep.push([id, first, child]);
 		return child;
 	}
 
+	/**
+	 * 停止当前跟踪并记录信息。
+	 */
 	stop() {
 		const dur = Date.now() - this._start;
 		Trace._totals += dur;

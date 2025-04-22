@@ -24,6 +24,16 @@ function createDecorator(mapFn: (fn: Function, key: string) => Function): Method
 	};
 }
 
+/**
+ * 缓存装饰器，属于方法装饰器
+ *
+ * 用于缓存函数的结果，避免重复计算
+ *
+ * @param _target - 目标对象
+ * @param key - 属性键
+ * @param descriptor - 属性描述符
+ * @returns 装饰后的函数
+ */
 export function memoize(_target: Object, key: string, descriptor: PropertyDescriptor) {
 	let fnKey: 'value' | 'get' | null = null;
 	let fn: Function | null = null;
