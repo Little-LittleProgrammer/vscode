@@ -141,6 +141,7 @@ if (process.platform === 'win32' || process.platform === 'linux') {
 	app.commandLine.appendSwitch('lang	', electronLocale);
 }
 
+// electron的ready事件
 // 在准备就绪后加载我们的代码
 app.once('ready', function () {
 	// 如果指定了 trace 参数，则开始跟踪， 性能分析

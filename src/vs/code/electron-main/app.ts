@@ -514,6 +514,19 @@ export class CodeApplication extends Disposable {
 		//#endregion
 	}
 
+	/**
+	 * `startup` 方法是 VS Code 主进程 `CodeApplication` 类的核心入口点和初始化函数。
+	 * 它的主要目的包括：
+	 * 1. 环境设置与日志记录：记录启动信息，进行特定于操作系统的设置。
+	 * 2. 核心服务初始化 (`initServices`)：创建和初始化主进程所需的关键服务 (窗口管理、生命周期、IPC、日志、配置、文件等)。
+	 * 3. 进程间通信 (IPC) 设置：启动主进程 IPC 服务，设置和连接共享进程，并注册各种 IPC 通道。
+	 * 4. 协议 URL 处理：设置处理 `vscode://` 等协议 URL 的逻辑。
+	 * 5. 窗口管理与启动：根据启动参数或协议 URL 打开第一个 VS Code 窗口。
+	 * 6. 生命周期管理：管理应用程序的生命周期阶段。
+	 * 7. 启动后任务：执行窗口打开后的初始化任务（如互斥锁、Shell 环境解析、崩溃报告器设置）。
+	 *
+	 * 总而言之，`startup` 方法负责编排 VS Code 主进程从启动到第一个窗口可用并运行起来的整个复杂初始化流程。
+	 */
 	async startup(): Promise<void> {
 		// 启动 VS Code
 		this.logService.debug('Starting VS Code');
@@ -567,7 +580,7 @@ export class CodeApplication extends Disposable {
 		// 共享进程
 		const { sharedProcessReady, sharedProcessClient } = this.setupSharedProcess(machineId, sqmId, devDeviceId);
 
-		// 服务
+		// 创建app实例服务
 		const appInstantiationService = await this.initServices(machineId, sqmId, devDeviceId, sharedProcessReady);
 
 		// 错误遥测
@@ -1216,6 +1229,19 @@ export class CodeApplication extends Disposable {
 		mainProcessElectronServer.registerChannel(ipcUtilityProcessWorkerChannelName, utilityProcessWorkerChannel);
 	}
 
+	/**
+	 * 方法负责在 VS Code 应用程序启动时决定并打开初始窗口。它的核心逻辑是根据不同的启动方式和参数来确定应该打开什么内容。
+	 *
+	 * 1. 获取依赖服务: 首先，它通过 accessor 获取必要的服务，主要是窗口管理服务 IWindowsMainService 和辅助窗口服务 IAuxiliaryWindowsMainService。
+	 * 2. 确定启动上下文: 判断 VS Code 是从命令行 (CLI) 启动还是从桌面环境（例如点击图标） (DESKTOP) 启动。
+	 * 3. 处理协议链接: 如果 initialProtocolUrls 存在，则表示有来自协议链接的窗口要打开。
+	 * 4. 处理文件/文件夹参数: 如果没有文件/文件夹参数，则检查是否需要强制打开新窗口。
+	 * 5. 默认: 从 cli 读取路径。
+	 *
+	 * @param accessor
+	 * @param initialProtocolUrls
+	 * @returns
+	 */
 	private async openFirstWindow(accessor: ServicesAccessor, initialProtocolUrls: IInitialProtocolUrls | undefined): Promise<ICodeWindow[]> {
 		const windowsMainService = this.windowsMainService = accessor.get(IWindowsMainService);
 		this.auxiliaryWindowsMainService = accessor.get(IAuxiliaryWindowsMainService);
@@ -1227,6 +1253,7 @@ export class CodeApplication extends Disposable {
 		if (initialProtocolUrls) {
 
 			// Openables 可以直接作为窗口打开
+			// 优先级最高: 如果应用是通过 vscode:// 协议 URL 启动的，并且这些 URL 可以直接映射为要打开的文件、文件夹或工作区 (openables)，则优先打开这些内容对应的窗口
 			if (initialProtocolUrls.openables.length > 0) {
 				return windowsMainService.open({
 					context,
