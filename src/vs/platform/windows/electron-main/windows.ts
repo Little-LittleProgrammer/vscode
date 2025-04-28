@@ -90,31 +90,34 @@ export interface IBaseOpenConfiguration {
 	readonly contextWindowId?: number;
 }
 
+/**
+ * 打开配置
+ */
 export interface IOpenConfiguration extends IBaseOpenConfiguration {
-	readonly cli: NativeParsedArgs;
-	readonly userEnv?: IProcessEnvironment;
-	readonly urisToOpen?: IWindowOpenable[];
-	readonly waitMarkerFileURI?: URI;
-	readonly preferNewWindow?: boolean;
-	readonly forceNewWindow?: boolean;
-	readonly forceNewTabbedWindow?: boolean;
-	readonly forceReuseWindow?: boolean;
-	readonly forceEmpty?: boolean;
-	readonly diffMode?: boolean;
-	readonly mergeMode?: boolean;
-	addMode?: boolean;
-	removeMode?: boolean;
-	readonly gotoLineMode?: boolean;
-	readonly initialStartup?: boolean;
-	readonly noRecentEntry?: boolean;
+	readonly cli: NativeParsedArgs; // 命令行参数
+	readonly userEnv?: IProcessEnvironment; // 用户环境
+	readonly urisToOpen?: IWindowOpenable[]; // 要打开的 URI
+	readonly waitMarkerFileURI?: URI; // 等待标记文件 URI
+	readonly preferNewWindow?: boolean; // 首选新窗口
+	readonly forceNewWindow?: boolean; // 强制新窗口
+	readonly forceNewTabbedWindow?: boolean; // 强制新标签窗口
+	readonly forceReuseWindow?: boolean; // 强制重用窗口
+	readonly forceEmpty?: boolean; // 强制空窗口
+	readonly diffMode?: boolean; // 差异模式
+	readonly mergeMode?: boolean; // 合并模式
+	addMode?: boolean; // 添加模式
+	removeMode?: boolean; // 移除模式
+	readonly gotoLineMode?: boolean; // 行号模式
+	readonly initialStartup?: boolean; // 初始启动
+	readonly noRecentEntry?: boolean; // 不添加到最近文档
 	/**
-	 * The remote authority to use when windows are opened with either
-	 * - no workspace (empty window)
-	 * - a workspace that is neither `file://` nor `vscode-remote://`
+	 * 当使用 `file://` 或 `vscode-remote://` 打开窗口时，使用的远程授权
+	 * - 没有工作区（空窗口）
+	 * - 既不是 `file://` 也不是 `vscode-remote://` 的工作区
 	 */
-	readonly remoteAuthority?: string;
-	readonly forceProfile?: string;
-	readonly forceTempProfile?: boolean;
+	readonly remoteAuthority?: string; // 远程授权
+	readonly forceProfile?: string; // 强制配置文件
+	readonly forceTempProfile?: boolean; // 强制临时配置文件
 }
 
 export interface IOpenEmptyConfiguration extends IBaseOpenConfiguration { }
@@ -217,6 +220,11 @@ export function defaultBrowserWindowOptions(accessor: ServicesAccessor, windowSt
 
 export function getLastFocused(windows: ICodeWindow[]): ICodeWindow | undefined;
 export function getLastFocused(windows: IAuxiliaryWindow[]): IAuxiliaryWindow | undefined;
+/**
+ * 获取最后一个活动窗口
+ * @param windows 窗口列表
+ * @returns 最后一个活动窗口
+ */
 export function getLastFocused(windows: ICodeWindow[] | IAuxiliaryWindow[]): ICodeWindow | IAuxiliaryWindow | undefined {
 	let lastFocusedWindow: ICodeWindow | IAuxiliaryWindow | undefined = undefined;
 	let maxLastFocusTime = Number.MIN_VALUE;

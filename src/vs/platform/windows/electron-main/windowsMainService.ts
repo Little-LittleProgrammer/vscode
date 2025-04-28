@@ -87,35 +87,34 @@ interface IOpenBrowserWindowOptions {
 interface IPathResolveOptions {
 
 	/**
-	 * By default, resolving a path will check
-	 * if the path exists. This can be disabled
-	 * with this flag.
+	 * 默认情况下，解析路径时会检查
+	 * 路径是否存在。可以使用此标志
+	 * 禁用该检查。
 	 */
 	readonly ignoreFileNotFound?: boolean;
 
 	/**
-	 * Will reject a path if it points to a transient
-	 * workspace as indicated by a `transient: true`
-	 * property in the workspace file.
+	 * 如果路径指向一个临时工作区
+	 * （由工作区文件中的 `transient: true`
+	 * 属性指示），则会拒绝该路径。
 	 */
 	readonly rejectTransientWorkspaces?: boolean;
 
 	/**
-	 * If enabled, will resolve the path line/column
-	 * aware and properly remove this information
-	 * from the resulting file path.
+	 * 如果启用，将解析路径时会识别行/列信息
+	 * 并从结果文件路径中正确移除此信息。
 	 */
 	readonly gotoLineMode?: boolean;
 
 	/**
-	 * Forces to resolve the provided path as workspace
-	 * file instead of opening it as a file.
+	 * 强制将提供的路径解析为工作区
+	 * 文件而不是将其作为文件打开。
 	 */
 	readonly forceOpenWorkspaceAsFile?: boolean;
 
 	/**
-	 * The remoteAuthority to use if the URL to open is
-	 * neither `file` nor `vscode-remote`.
+	 * 如果要打开的 URL 既不是 `file` 也不是
+	 * `vscode-remote`，则使用此 remoteAuthority。
 	 */
 	readonly remoteAuthority?: string;
 }
@@ -133,29 +132,29 @@ interface IFilesToOpen {
 interface IPathToOpen<T = IEditorOptions> extends IPath<T> {
 
 	/**
-	 * The workspace to open
+	 * 要打开的工作区
 	 */
 	readonly workspace?: IWorkspaceIdentifier | ISingleFolderWorkspaceIdentifier;
 
 	/**
-	 * Whether the path is considered to be transient or not
-	 * for example, a transient workspace should not add to
-	 * the workspaces history and should never restore.
+	 * 路径是否被视为临时路径
+	 * 例如，临时工作区不应添加到
+	 * 工作区历史记录中，并且永远不应还原。
 	 */
 	readonly transient?: boolean;
 
 	/**
-	 * The backup path to use
+	 * 要使用的备份路径
 	 */
 	readonly backupPath?: string;
 
 	/**
-	 * The remote authority for the Code instance to open. Undefined if not remote.
+	 * 要打开的 Code 实例的远程授权。未定义表示非远程。
 	 */
 	readonly remoteAuthority?: string;
 
 	/**
-	 * Optional label for the recent history
+	 * 最近历史记录的可选标签
 	 */
 	label?: string;
 }
@@ -174,12 +173,24 @@ function isWorkspacePathToOpen(path: IPathToOpen | undefined): path is IWorkspac
 	return isWorkspaceIdentifier(path?.workspace);
 }
 
+/**
+ * 判断路径是否为单文件夹工作区路径。
+ * @param path 路径
+ * @returns 是否为单文件夹工作区路径
+ */
 function isSingleFolderWorkspacePathToOpen(path: IPathToOpen | undefined): path is ISingleFolderWorkspacePathToOpen {
 	return isSingleFolderWorkspaceIdentifier(path?.workspace);
 }
 
 //#endregion
 
+/*
+ * VS Code 主进程窗口管理核心服务
+ *
+ * 负责所有主窗口的创建、打开、聚焦、关闭、状态恢复、命令行/协议/API 路径解析、窗口间通信等。
+ * 该服务是 VS Code 桌面端窗口生命周期的总控枢纽。
+ * 每个窗口都是一个渲染器进程
+ */
 export class WindowsMainService extends Disposable implements IWindowsMainService {
 
 	declare readonly _serviceBrand: undefined;
@@ -243,25 +254,29 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		this.registerListeners();
 	}
 
+	/**
+	 * 注册事件监听器。
+	 * 监听工作区进入事件，处理窗口准备就绪信号，更新扩展开发路径，处理窗口关闭事件。
+	 */
 	private registerListeners(): void {
 
-		// Signal a window is ready after having entered a workspace
+		// 在进入工作区后，发出窗口准备就绪的信号
 		this._register(this.workspacesManagementMainService.onDidEnterWorkspace(event => this._onDidSignalReadyWindow.fire(event.window)));
 
-		// Update valid roots in protocol service for extension dev windows
+		// 为扩展开发窗口更新协议服务中的有效根目录
 		this._register(this.onDidSignalReadyWindow(window => {
 			if (window.config?.extensionDevelopmentPath || window.config?.extensionTestsPath) {
 				const disposables = new DisposableStore();
 				disposables.add(Event.any(window.onDidClose, window.onDidDestroy)(() => disposables.dispose()));
 
-				// Allow access to extension development path
+				// 允许访问扩展开发路径
 				if (window.config.extensionDevelopmentPath) {
 					for (const extensionDevelopmentPath of window.config.extensionDevelopmentPath) {
 						disposables.add(this.protocolMainService.addValidFileRoot(extensionDevelopmentPath));
 					}
 				}
 
-				// Allow access to extension tests path
+				// 允许访问扩展测试路径
 				if (window.config.extensionTestsPath) {
 					disposables.add(this.protocolMainService.addValidFileRoot(window.config.extensionTestsPath));
 				}
@@ -269,6 +284,12 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		}));
 	}
 
+	/**
+	 * 打开一个空窗口（无文件/文件夹/工作区）。
+	 * @param openConfig 打开配置
+	 * @param options 额外选项
+	 * @returns 打开的窗口数组
+	 */
 	openEmptyWindow(openConfig: IOpenEmptyConfiguration, options?: IOpenEmptyWindowOptions): Promise<ICodeWindow[]> {
 		const cli = this.environmentMainService.args;
 		const remoteAuthority = options?.remoteAuthority || undefined;
@@ -279,49 +300,65 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return this.open({ ...openConfig, cli, forceEmpty, forceNewWindow, forceReuseWindow, remoteAuthority, forceTempProfile: options?.forceTempProfile, forceProfile: options?.forceProfile });
 	}
 
+	/**
+	 * 将指定窗口置于前台，并处理 --wait 参数。
+	 * @param window 目标窗口
+	 * @param openConfig 打开配置
+	 */
 	openExistingWindow(window: ICodeWindow, openConfig: IOpenConfiguration): void {
 
-		// Bring window to front
+		// 将窗口置于前台
 		window.focus();
 
-		// Handle --wait
+		// 处理 --wait
 		this.handleWaitMarkerFile(openConfig, [window]);
 	}
 
+	/**
+	 * 主入口，处理所有"打开窗口"请求。
+	 * 解析要打开的路径，决定新开窗口还是复用已有窗口，处理 diff/merge/wait 等特殊模式，恢复上次会话窗口。
+	 * @param openConfig 打开配置
+	 * @returns 打开的窗口数组
+	 */
 	async open(openConfig: IOpenConfiguration): Promise<ICodeWindow[]> {
-		this.logService.trace('windowsManager#open');
+		this.logService.trace('windowsManager#open'); // 跟踪打开窗口
 
-		// Make sure addMode/removeMode is only enabled if we have an active window
+		// 确保 addMode/removeMode 仅在我们有活动窗口时启用
+		// 如果初始启动或没有活动窗口，则禁用
 		if ((openConfig.addMode || openConfig.removeMode) && (openConfig.initialStartup || !this.getLastActiveWindow())) {
 			openConfig.addMode = false;
 			openConfig.removeMode = false;
 		}
 
+		// 要添加的文件夹
 		const foldersToAdd: ISingleFolderWorkspacePathToOpen[] = [];
+		// 要移除的文件夹
 		const foldersToRemove: ISingleFolderWorkspacePathToOpen[] = [];
-
+		// 要打开的文件夹
 		const foldersToOpen: ISingleFolderWorkspacePathToOpen[] = [];
-
+		// 要打开的工作区
 		const workspacesToOpen: IWorkspacePathToOpen[] = [];
+		// 要恢复的无标题工作区
 		const untitledWorkspacesToRestore: IWorkspacePathToOpen[] = [];
-
+		// 要恢复的空窗口备份
 		const emptyWindowsWithBackupsToRestore: IEmptyWindowBackupInfo[] = [];
-
+		// 要打开的文件
 		let filesToOpen: IFilesToOpen | undefined;
+		// 是否可能打开空窗口
 		let maybeOpenEmptyWindow = false;
 
-		// Identify things to open from open config
+		// 从打开配置中识别要打开的内容
 		const pathsToOpen = await this.getPathsToOpen(openConfig);
 		this.logService.trace('windowsManager#open pathsToOpen', pathsToOpen);
 		for (const path of pathsToOpen) {
 			if (isSingleFolderWorkspacePathToOpen(path)) {
 				if (openConfig.addMode) {
-					// When run with --add, take the folders that are to be opened as
-					// folders that should be added to the currently active window.
+					// 当使用 --add 运行时，将要打开的文件夹视为
+					// 应添加到当前活动窗口的文件夹。
 					foldersToAdd.push(path);
 				} else if (openConfig.removeMode) {
-					// When run with --remove, take the folders that are to be opened as
-					// folders that should be removed from the currently active window.
+					// 当使用 --remove 运行时，将要打开的文件夹视为
+					// 应从当前活动窗口中移除的文件夹。
 					foldersToRemove.push(path);
 				} else {
 					foldersToOpen.push(path);
@@ -336,61 +373,61 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			} else if (path.backupPath) {
 				emptyWindowsWithBackupsToRestore.push({ backupFolder: basename(path.backupPath), remoteAuthority: path.remoteAuthority });
 			} else {
-				maybeOpenEmptyWindow = true; // depends on other parameters such as `forceEmpty` and how many windows have opened already
+				maybeOpenEmptyWindow = true; // 取决于其他参数，如 `forceEmpty` 以及已经打开了多少窗口
 			}
 		}
 
-		// When run with --diff, take the first 2 files to open as files to diff
+		// 当使用 --diff 运行时，将前 2 个要打开的文件作为要比较的文件
 		if (openConfig.diffMode && filesToOpen && filesToOpen.filesToOpenOrCreate.length >= 2) {
 			filesToOpen.filesToDiff = filesToOpen.filesToOpenOrCreate.slice(0, 2);
 			filesToOpen.filesToOpenOrCreate = [];
 		}
 
-		// When run with --merge, take the first 4 files to open as files to merge
+		// 当使用 --merge 运行时，将前 4 个要打开的文件作为要合并的文件
 		if (openConfig.mergeMode && filesToOpen && filesToOpen.filesToOpenOrCreate.length === 4) {
 			filesToOpen.filesToMerge = filesToOpen.filesToOpenOrCreate.slice(0, 4);
 			filesToOpen.filesToOpenOrCreate = [];
 			filesToOpen.filesToDiff = [];
 		}
 
-		// When run with --wait, make sure we keep the paths to wait for
+		// 使用 --wait 运行时，确保我们保留要等待的路径
 		if (filesToOpen && openConfig.waitMarkerFileURI) {
-			filesToOpen.filesToWait = { paths: coalesce([...filesToOpen.filesToDiff, filesToOpen.filesToMerge[3] /* [3] is the resulting merge file */, ...filesToOpen.filesToOpenOrCreate]), waitMarkerFileUri: openConfig.waitMarkerFileURI };
+			filesToOpen.filesToWait = { paths: coalesce([...filesToOpen.filesToDiff, filesToOpen.filesToMerge[3] /* [3] 是最终的合并文件 */, ...filesToOpen.filesToOpenOrCreate]), waitMarkerFileUri: openConfig.waitMarkerFileURI };
 		}
 
-		// These are windows to restore because of hot-exit or from previous session (only performed once on startup!)
+		// 这些是因为热退出或从上一个会话恢复的窗口（仅在启动时执行一次！）
 		if (openConfig.initialStartup) {
 
-			// Untitled workspaces are always restored
+			// 未命名的工作区始终会被恢复
 			untitledWorkspacesToRestore.push(...this.workspacesManagementMainService.getUntitledWorkspaces());
 			workspacesToOpen.push(...untitledWorkspacesToRestore);
 
-			// Empty windows with backups are always restored
+			// 带有备份的空窗口始终会被恢复
 			emptyWindowsWithBackupsToRestore.push(...this.backupMainService.getEmptyWindowBackups());
 		} else {
 			emptyWindowsWithBackupsToRestore.length = 0;
 		}
 
-		// Open based on config
+		// 根据配置打开
 		const { windows: usedWindows, filesOpenedInWindow } = await this.doOpen(openConfig, workspacesToOpen, foldersToOpen, emptyWindowsWithBackupsToRestore, maybeOpenEmptyWindow, filesToOpen, foldersToAdd, foldersToRemove);
 
 		this.logService.trace(`windowsManager#open used window count ${usedWindows.length} (workspacesToOpen: ${workspacesToOpen.length}, foldersToOpen: ${foldersToOpen.length}, emptyToRestore: ${emptyWindowsWithBackupsToRestore.length}, maybeOpenEmptyWindow: ${maybeOpenEmptyWindow})`);
 
-		// Make sure to pass focus to the most relevant of the windows if we open multiple
+		// 如果我们打开多个窗口，确保将焦点传递给最相关的窗口
 		if (usedWindows.length > 1) {
 
-			// 1.) focus window we opened files in always with highest priority
+			// 1.) 始终优先聚焦我们在其中打开文件的窗口
 			if (filesOpenedInWindow) {
 				filesOpenedInWindow.focus();
 			}
 
-			// Otherwise, find a good window based on open params
+			// 否则，根据打开参数找到一个合适的窗口
 			else {
 				const focusLastActive = this.windowsStateHandler.state.lastActiveWindow && !openConfig.forceEmpty && !openConfig.cli._.length && !openConfig.cli['file-uri'] && !openConfig.cli['folder-uri'] && !(openConfig.urisToOpen && openConfig.urisToOpen.length);
 				let focusLastOpened = true;
 				let focusLastWindow = true;
 
-				// 2.) focus last active window if we are not instructed to open any paths
+				// 2.) 如果我们没有被指示打开任何路径，则聚焦上次活动的窗口
 				if (focusLastActive) {
 					const lastActiveWindow = usedWindows.filter(window => this.windowsStateHandler.state.lastActiveWindow && window.backupPath === this.windowsStateHandler.state.lastActiveWindow.backupPath);
 					if (lastActiveWindow.length) {
@@ -400,13 +437,13 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 					}
 				}
 
-				// 3.) if instructed to open paths, focus last window which is not restored
+				// 3.) 如果被指示打开路径，则聚焦最后一个非恢复的窗口
 				if (focusLastOpened) {
 					for (let i = usedWindows.length - 1; i >= 0; i--) {
 						const usedWindow = usedWindows[i];
 						if (
-							(usedWindow.openedWorkspace && untitledWorkspacesToRestore.some(workspace => usedWindow.openedWorkspace && workspace.workspace.id === usedWindow.openedWorkspace.id)) ||	// skip over restored workspace
-							(usedWindow.backupPath && emptyWindowsWithBackupsToRestore.some(empty => usedWindow.backupPath && empty.backupFolder === basename(usedWindow.backupPath)))							// skip over restored empty window
+							(usedWindow.openedWorkspace && untitledWorkspacesToRestore.some(workspace => usedWindow.openedWorkspace && workspace.workspace.id === usedWindow.openedWorkspace.id)) ||	// 跳过已恢复的工作区
+							(usedWindow.backupPath && emptyWindowsWithBackupsToRestore.some(empty => usedWindow.backupPath && empty.backupFolder === basename(usedWindow.backupPath)))							// 跳过已恢复的空窗口
 						) {
 							continue;
 						}
@@ -417,21 +454,21 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 					}
 				}
 
-				// 4.) finally, always ensure to have at least last used window focused
+				// 4.) 最后，始终确保至少聚焦最后使用的窗口
 				if (focusLastWindow) {
 					usedWindows[usedWindows.length - 1].focus();
 				}
 			}
 		}
 
-		// Remember in recent document list (unless this opens for extension development)
-		// Also do not add paths when files are opened for diffing or merging, only if opened individually
+		// 记住在最近文档列表中（除非这是为扩展开发而打开的）
+		// 当文件是为了比较或合并而打开时，也不添加路径，只有单独打开时才添加
 		const isDiff = filesToOpen && filesToOpen.filesToDiff.length > 0;
 		const isMerge = filesToOpen && filesToOpen.filesToMerge.length > 0;
 		if (!usedWindows.some(window => window.isExtensionDevelopmentHost) && !isDiff && !isMerge && !openConfig.noRecentEntry) {
 			const recents: IRecent[] = [];
 			for (const pathToOpen of pathsToOpen) {
-				if (isWorkspacePathToOpen(pathToOpen) && !pathToOpen.transient /* never add transient workspaces to history */) {
+				if (isWorkspacePathToOpen(pathToOpen) && !pathToOpen.transient /* 永远不要将临时工作区添加到历史记录中 */) {
 					recents.push({ label: pathToOpen.label, workspace: pathToOpen.workspace, remoteAuthority: pathToOpen.remoteAuthority });
 				} else if (isSingleFolderWorkspacePathToOpen(pathToOpen)) {
 					recents.push({ label: pathToOpen.label, folderUri: pathToOpen.workspace.uri, remoteAuthority: pathToOpen.remoteAuthority });
@@ -443,17 +480,23 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			this.workspacesHistoryMainService.addRecentlyOpened(recents);
 		}
 
-		// Handle --wait
+		// 处理 --wait
 		this.handleWaitMarkerFile(openConfig, usedWindows);
 
 		return usedWindows;
 	}
 
+	/**
+	 * 处理 --wait 模式下的等待文件逻辑。
+	 * 窗口关闭或加载新内容后，删除等待标记文件。
+	 * @param openConfig 打开配置
+	 * @param usedWindows 已打开的窗口
+	 */
 	private handleWaitMarkerFile(openConfig: IOpenConfiguration, usedWindows: ICodeWindow[]): void {
 
-		// If we got started with --wait from the CLI, we need to signal to the outside when the window
-		// used for the edit operation is closed or loaded to a different folder so that the waiting
-		// process can continue. We do this by deleting the waitMarkerFilePath.
+		// 如果我们从 CLI 启动时带有 --wait 参数，我们需要向外部发送信号，当用于
+		// 编辑操作的窗口被关闭或加载到不同的文件夹时，等待的
+		// 进程可以继续。我们通过删除 waitMarkerFilePath 来实现这一点。
 		const waitMarkerFileURI = openConfig.waitMarkerFileURI;
 		if (openConfig.context === OpenContext.CLI && waitMarkerFileURI && usedWindows.length === 1 && usedWindows[0]) {
 			(async () => {
@@ -462,12 +505,25 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 				try {
 					await this.fileService.del(waitMarkerFileURI);
 				} catch (error) {
-					// ignore - could have been deleted from the window already
+					// 忽略 - 可能已经从窗口中删除了
 				}
 			})();
 		}
 	}
 
+	/**
+	 * 根据解析后的路径和参数，实际打开窗口。
+	 * 支持文件夹添加/移除、优先复用已有窗口、恢复空窗口/工作区等。
+	 * @param openConfig 打开配置
+	 * @param workspacesToOpen 要打开的工作区
+	 * @param foldersToOpen 要打开的文件夹
+	 * @param emptyToRestore 要恢复的空窗口
+	 * @param maybeOpenEmptyWindow 是否可能打开空窗口
+	 * @param filesToOpen 要打开的文件
+	 * @param foldersToAdd 要添加的文件夹
+	 * @param foldersToRemove 要移除的文件夹
+	 * @returns 打开的窗口及文件打开窗口
+	 */
 	private async doOpen(
 		openConfig: IOpenConfiguration,
 		workspacesToOpen: IWorkspacePathToOpen[],
@@ -479,23 +535,24 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		foldersToRemove: ISingleFolderWorkspacePathToOpen[]
 	): Promise<{ windows: ICodeWindow[]; filesOpenedInWindow: ICodeWindow | undefined }> {
 
-		// Keep track of used windows and remember
-		// if files have been opened in one of them
+		// 跟踪已使用的窗口并记住，是否在其中一个窗口中打开了文件
+		// 用于存储已打开的窗口
 		const usedWindows: ICodeWindow[] = [];
+		// 用于存储已打开的文件
 		let filesOpenedInWindow: ICodeWindow | undefined = undefined;
 		function addUsedWindow(window: ICodeWindow, openedFiles?: boolean): void {
 			usedWindows.push(window);
 
 			if (openedFiles) {
 				filesOpenedInWindow = window;
-				filesToOpen = undefined; // reset `filesToOpen` since files have been opened
+				filesToOpen = undefined; // 重置 `filesToOpen` 因为文件已经打开
 			}
 		}
 
-		// Settings can decide if files/folders open in new window or not
+		// 设置决定是否在新的窗口中打开文件/文件夹
 		let { openFolderInNewWindow, openFilesInNewWindow } = this.shouldOpenNewWindow(openConfig);
 
-		// Handle folders to add/remove by looking for the last active workspace (not on initial startup)
+		// 处理要添加/删除的文件夹，通过查找最后一个活动的 workspace（不在初始启动时）
 		if (!openConfig.initialStartup && (foldersToAdd.length > 0 || foldersToRemove.length > 0)) {
 			const authority = foldersToAdd.at(0)?.remoteAuthority ?? foldersToRemove.at(0)?.remoteAuthority;
 			const lastActiveWindow = this.getLastActiveWindowForAuthority(authority);
@@ -504,22 +561,22 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			}
 		}
 
-		// Handle files to open/diff/merge or to create when we dont open a folder and we do not restore any
-		// folder/untitled from hot-exit by trying to open them in the window that fits best
+		// 处理要打开/比较/合并的文件或创建文件，当不打开文件夹并且不恢复任何
+		// 文件夹/无标题，通过尝试在最适合的窗口中打开它们
 		const potentialNewWindowsCount = foldersToOpen.length + workspacesToOpen.length + emptyToRestore.length;
 		if (filesToOpen && potentialNewWindowsCount === 0) {
 
-			// Find suitable window or folder path to open files in
-			const fileToCheck: IPath<IEditorOptions> | undefined = filesToOpen.filesToOpenOrCreate[0] || filesToOpen.filesToDiff[0] || filesToOpen.filesToMerge[3] /* [3] is the resulting merge file */;
+			// 查找合适的窗口或文件夹路径来打开文件
+			const fileToCheck: IPath<IEditorOptions> | undefined = filesToOpen.filesToOpenOrCreate[0] || filesToOpen.filesToDiff[0] || filesToOpen.filesToMerge[3] /* [3] 是最终的合并文件 */;
 
-			// only look at the windows with correct authority
+			// 只查看具有正确授权的窗口
 			const windows = this.getWindows().filter(window => filesToOpen && isEqualAuthority(window.remoteAuthority, filesToOpen.remoteAuthority));
 
-			// figure out a good window to open the files in if any
-			// with a fallback to the last active window.
+			// 找出一个好的窗口来打开文件，如果任何窗口
+			// 具有 fallback 到最后一个活动的窗口。
 			//
-			// in case `openFilesInNewWindow` is enforced, we skip
-			// this step.
+			// 如果强制 `openFilesInNewWindow`，我们跳过
+			// 这一步。
 			let windowToUseForFiles: ICodeWindow | undefined = undefined;
 			if (fileToCheck?.fileUri && !openFilesInNewWindow) {
 				if (openConfig.context === OpenContext.DESKTOP || openConfig.context === OpenContext.CLI || openConfig.context === OpenContext.DOCK || openConfig.context === OpenContext.LINK) {
@@ -531,26 +588,26 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 				}
 			}
 
-			// We found a window to open the files in
+			// 我们找到了一个窗口来打开文件
 			if (windowToUseForFiles) {
 
-				// Window is workspace
+				// 窗口是 workspace
 				if (isWorkspaceIdentifier(windowToUseForFiles.openedWorkspace)) {
 					workspacesToOpen.push({ workspace: windowToUseForFiles.openedWorkspace, remoteAuthority: windowToUseForFiles.remoteAuthority });
 				}
 
-				// Window is single folder
+				// 窗口是单个文件夹
 				else if (isSingleFolderWorkspaceIdentifier(windowToUseForFiles.openedWorkspace)) {
 					foldersToOpen.push({ workspace: windowToUseForFiles.openedWorkspace, remoteAuthority: windowToUseForFiles.remoteAuthority });
 				}
 
-				// Window is empty
+				// 窗口是空的
 				else {
 					addUsedWindow(this.doOpenFilesInExistingWindow(openConfig, windowToUseForFiles, filesToOpen), true);
 				}
 			}
 
-			// Finally, if no window or folder is found, just open the files in an empty window
+			// 最后，如果没有窗口或文件夹，只需在空窗口中打开文件
 			else {
 				addUsedWindow(await this.openInBrowserWindow({
 					userEnv: openConfig.userEnv,
@@ -566,23 +623,23 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			}
 		}
 
-		// Handle workspaces to open (instructed and to restore)
+		// 处理要打开的工作区（指示和恢复）
 		const allWorkspacesToOpen = distinct(workspacesToOpen, workspace => workspace.workspace.id); // prevent duplicates
 		if (allWorkspacesToOpen.length > 0) {
 
-			// Check for existing instances
+			// 检查是否存在实例
 			const windowsOnWorkspace = coalesce(allWorkspacesToOpen.map(workspaceToOpen => findWindowOnWorkspaceOrFolder(this.getWindows(), workspaceToOpen.workspace.configPath)));
 			if (windowsOnWorkspace.length > 0) {
 				const windowOnWorkspace = windowsOnWorkspace[0];
 				const filesToOpenInWindow = isEqualAuthority(filesToOpen?.remoteAuthority, windowOnWorkspace.remoteAuthority) ? filesToOpen : undefined;
 
-				// Do open files
+				// 打开文件
 				addUsedWindow(this.doOpenFilesInExistingWindow(openConfig, windowOnWorkspace, filesToOpenInWindow), !!filesToOpenInWindow);
 
 				openFolderInNewWindow = true; // any other folders to open must open in new window then
 			}
 
-			// Open remaining ones
+			// 打开剩余的
 			for (const workspaceToOpen of allWorkspacesToOpen) {
 				if (windowsOnWorkspace.some(window => window.openedWorkspace && window.openedWorkspace.id === workspaceToOpen.workspace.id)) {
 					continue; // ignore folders that are already open
@@ -598,23 +655,23 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			}
 		}
 
-		// Handle folders to open (instructed and to restore)
+		// 处理要打开的文件夹（指示和恢复）
 		const allFoldersToOpen = distinct(foldersToOpen, folder => extUriBiasedIgnorePathCase.getComparisonKey(folder.workspace.uri)); // prevent duplicates
 		if (allFoldersToOpen.length > 0) {
 
-			// Check for existing instances
+			// 检查是否存在实例
 			const windowsOnFolderPath = coalesce(allFoldersToOpen.map(folderToOpen => findWindowOnWorkspaceOrFolder(this.getWindows(), folderToOpen.workspace.uri)));
 			if (windowsOnFolderPath.length > 0) {
 				const windowOnFolderPath = windowsOnFolderPath[0];
 				const filesToOpenInWindow = isEqualAuthority(filesToOpen?.remoteAuthority, windowOnFolderPath.remoteAuthority) ? filesToOpen : undefined;
 
-				// Do open files
+				// 打开文件
 				addUsedWindow(this.doOpenFilesInExistingWindow(openConfig, windowOnFolderPath, filesToOpenInWindow), !!filesToOpenInWindow);
 
 				openFolderInNewWindow = true; // any other folders to open must open in new window then
 			}
 
-			// Open remaining ones
+			// 打开剩余的
 			for (const folderToOpen of allFoldersToOpen) {
 				if (windowsOnFolderPath.some(window => isSingleFolderWorkspaceIdentifier(window.openedWorkspace) && extUriBiasedIgnorePathCase.isEqual(window.openedWorkspace.uri, folderToOpen.workspace.uri))) {
 					continue; // ignore folders that are already open
@@ -630,7 +687,7 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			}
 		}
 
-		// Handle empty to restore
+		// 处理要恢复的空窗口
 		const allEmptyToRestore = distinct(emptyToRestore, info => info.backupFolder); // prevent duplicates
 		if (allEmptyToRestore.length > 0) {
 			for (const emptyWindowBackupInfo of allEmptyToRestore) {
@@ -656,6 +713,13 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return { windows: distinct(usedWindows), filesOpenedInWindow };
 	}
 
+	/**
+	 * 在已有窗口中打开文件。
+	 * @param configuration 打开配置
+	 * @param window 目标窗口
+	 * @param filesToOpen 要打开的文件
+	 * @returns 目标窗口
+	 */
 	private doOpenFilesInExistingWindow(configuration: IOpenConfiguration, window: ICodeWindow, filesToOpen?: IFilesToOpen): ICodeWindow {
 		this.logService.trace('windowsManager#doOpenFilesInExistingWindow', { filesToOpen });
 
@@ -673,6 +737,10 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return window;
 	}
 
+	/**
+	 * 聚焦主窗口或其子窗口。
+	 * @param mainWindow 主窗口
+	 */
 	private focusMainOrChildWindow(mainWindow: ICodeWindow): void {
 		let windowToFocus: ICodeWindow | IAuxiliaryWindow = mainWindow;
 
@@ -687,6 +755,13 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		windowToFocus.focus();
 	}
 
+	/**
+	 * 在已有窗口中添加/移除文件夹。
+	 * @param window 目标窗口
+	 * @param foldersToAdd 要添加的文件夹 URI 数组
+	 * @param foldersToRemove 要移除的文件夹 URI 数组
+	 * @returns 目标窗口
+	 */
 	private doAddRemoveFoldersInExistingWindow(window: ICodeWindow, foldersToAdd: URI[], foldersToRemove: URI[]): ICodeWindow {
 		this.logService.trace('windowsManager#doAddRemoveFoldersToExistingWindow', { foldersToAdd, foldersToRemove });
 
@@ -698,6 +773,15 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return window;
 	}
 
+	/**
+	 * 打开空窗口，支持复用已有窗口或新建。
+	 * @param openConfig 打开配置
+	 * @param forceNewWindow 是否强制新建窗口
+	 * @param remoteAuthority 远程授权
+	 * @param filesToOpen 要打开的文件
+	 * @param emptyWindowBackupInfo 空窗口备份信息
+	 * @returns 新建或复用的窗口
+	 */
 	private doOpenEmpty(openConfig: IOpenConfiguration, forceNewWindow: boolean, remoteAuthority: string | undefined, filesToOpen: IFilesToOpen | undefined, emptyWindowBackupInfo?: IEmptyWindowBackupInfo): Promise<ICodeWindow> {
 		this.logService.trace('windowsManager#doOpenEmpty', { restore: !!emptyWindowBackupInfo, remoteAuthority, filesToOpen, forceNewWindow });
 
@@ -721,6 +805,15 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		});
 	}
 
+	/**
+	 * 打开文件夹或工作区。
+	 * @param openConfig 打开配置
+	 * @param folderOrWorkspace 文件夹或工作区
+	 * @param forceNewWindow 是否强制新建窗口
+	 * @param filesToOpen 要打开的文件
+	 * @param windowToUse 指定复用窗口
+	 * @returns 新建或复用的窗口
+	 */
 	private doOpenFolderOrWorkspace(openConfig: IOpenConfiguration, folderOrWorkspace: IWorkspacePathToOpen | ISingleFolderWorkspacePathToOpen, forceNewWindow: boolean, filesToOpen: IFilesToOpen | undefined, windowToUse?: ICodeWindow): Promise<ICodeWindow> {
 		this.logService.trace('windowsManager#doOpenFolderOrWorkspace', { folderOrWorkspace, filesToOpen });
 
@@ -743,23 +836,29 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		});
 	}
 
+	/**
+	 * 解析出本次要打开的所有路径（文件/文件夹/工作区/空窗口）。
+	 * 支持 API、CLI、上次会话等多种来源。
+	 * @param openConfig 打开配置
+	 * @returns 要打开的路径数组
+	 */
 	private async getPathsToOpen(openConfig: IOpenConfiguration): Promise<IPathToOpen[]> {
 		let pathsToOpen: IPathToOpen[];
 		let isCommandLineOrAPICall = false;
 		let isRestoringPaths = false;
 
-		// Extract paths: from API
+		// Extract paths: from API 从 API 提取路径
 		if (openConfig.urisToOpen && openConfig.urisToOpen.length > 0) {
 			pathsToOpen = await this.doExtractPathsFromAPI(openConfig);
 			isCommandLineOrAPICall = true;
 		}
 
-		// Check for force empty
+		// Check for force empty 检查是否强制空窗口
 		else if (openConfig.forceEmpty) {
 			pathsToOpen = [EMPTY_WINDOW];
 		}
 
-		// Extract paths: from CLI
+		// Extract paths: from CLI 从 CLI 提取路径
 		else if (openConfig.cli._.length || openConfig.cli['folder-uri'] || openConfig.cli['file-uri']) {
 			pathsToOpen = await this.doExtractPathsFromCLI(openConfig.cli);
 			if (pathsToOpen.length === 0) {
@@ -769,7 +868,7 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			isCommandLineOrAPICall = true;
 		}
 
-		// Extract paths: from previous session
+		// Extract paths: from previous session 从上一个会话提取路径
 		else {
 			pathsToOpen = await this.doGetPathsFromLastSession();
 			if (pathsToOpen.length === 0) {
@@ -779,10 +878,10 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			isRestoringPaths = true;
 		}
 
-		// Handle the case of multiple folders being opened from CLI while we are
-		// not in `--add` or `--remove` mode by creating an untitled workspace, only if:
-		// - they all share the same remote authority
-		// - there is no existing workspace to open that matches these folders
+		// 当我们在 CLI 中打开多个文件夹时，并且我们不在 `--add` 或 `--remove` 模式下，
+		// 通过创建一个无标题的工作区来处理这种情况，只有当：
+		// - 它们都共享相同的远程授权
+		// - 没有现有工作区可以打开这些文件夹
 		if (!openConfig.addMode && !openConfig.removeMode && isCommandLineOrAPICall) {
 			const foldersToOpen = pathsToOpen.filter(path => isSingleFolderWorkspacePathToOpen(path));
 			if (foldersToOpen.length > 1) {
@@ -804,11 +903,9 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			}
 		}
 
-		// Check for `window.restoreWindows` setting to include all windows
-		// from the previous session if this is the initial startup and we have
-		// not restored windows already otherwise.
-		// Use `unshift` to ensure any new window to open comes last for proper
-		// focus treatment.
+		// 检查 `window.restoreWindows` 设置以包含所有窗口
+		// 如果这是初始启动并且我们没有恢复窗口，否则不恢复窗口。
+		// 使用 `unshift` 确保任何新窗口打开最后，以便正确处理焦点。
 		if (openConfig.initialStartup && !isRestoringPaths && this.configurationService.getValue<IWindowSettings | undefined>('window')?.restoreWindows === 'preserve') {
 			const lastSessionPaths = await this.doGetPathsFromLastSession();
 			pathsToOpen.unshift(...lastSessionPaths.filter(path => isWorkspacePathToOpen(path) || isSingleFolderWorkspacePathToOpen(path) || path.backupPath));
@@ -817,6 +914,11 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return pathsToOpen;
 	}
 
+	/**
+	 * 从 API 参数中解析路径。
+	 * @param openConfig 打开配置
+	 * @returns 路径数组
+	 */
 	private async doExtractPathsFromAPI(openConfig: IOpenConfiguration): Promise<IPathToOpen[]> {
 		const pathResolveOptions: IPathResolveOptions = {
 			gotoLineMode: openConfig.gotoLineMode,
@@ -851,6 +953,11 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return coalesce(pathsToOpen);
 	}
 
+	/**
+	 * 从 CLI 参数中解析路径。
+	 * @param cli 命令行参数
+	 * @returns 路径数组
+	 */
 	private async doExtractPathsFromCLI(cli: NativeParsedArgs): Promise<IPath[]> {
 		const pathsToOpen: IPathToOpen[] = [];
 		const pathResolveOptions: IPathResolveOptions = {
@@ -858,8 +965,8 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			gotoLineMode: cli.goto,
 			remoteAuthority: cli.remote || undefined,
 			forceOpenWorkspaceAsFile:
-				// special case diff / merge mode to force open
-				// workspace as file
+				// 特殊情况：在差异/合并模式下强制打开
+				// 工作区作为文件
 				// https://github.com/microsoft/vscode/issues/149731
 				cli.diff && cli._.length === 2 ||
 				cli.merge && cli._.length === 4
@@ -905,6 +1012,11 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return pathsToOpen;
 	}
 
+	/**
+	 * 将字符串参数转为 URI。
+	 * @param arg 字符串参数
+	 * @returns URI 或 undefined
+	 */
 	private cliArgToUri(arg: string): URI | undefined {
 		try {
 			const uri = URI.parse(arg);
@@ -925,6 +1037,10 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return undefined;
 	}
 
+	/**
+	 * 恢复上次会话的窗口路径。
+	 * @returns 路径数组
+	 */
 	private async doGetPathsFromLastSession(): Promise<IPathToOpen[]> {
 		const restoreWindowsSetting = this.getRestoreWindowsSetting();
 
@@ -982,6 +1098,10 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		}
 	}
 
+	/**
+	 * 获取窗口恢复策略（如 all/one/none）。
+	 * @returns 恢复策略
+	 */
 	private getRestoreWindowsSetting(): RestoreWindowsSetting {
 		let restoreWindows: RestoreWindowsSetting;
 		if (this.lifecycleMainService.wasRestarted) {
@@ -998,6 +1118,12 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return restoreWindows;
 	}
 
+	/**
+	 * 查找与指定文件夹集合匹配的工作区。
+	 * @param remoteAuthority 远程授权
+	 * @param folders 文件夹集合
+	 * @returns 匹配的工作区标识符或 undefined
+	 */
 	private async doGetWorkspaceMatchingFoldersFromLastSession(remoteAuthority: string | undefined, folders: ISingleFolderWorkspacePathToOpen[]): Promise<IWorkspaceIdentifier | undefined> {
 		const workspaces = (await this.doGetPathsFromLastSession()).filter(path => isWorkspacePathToOpen(path));
 		const folderUris = folders.map(folder => folder.workspace.uri);
@@ -1022,6 +1148,12 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return undefined;
 	}
 
+	/**
+	 * 将各种"可打开对象"解析为具体路径，支持本地/远程、文件/文件夹/工作区等。
+	 * @param openable 可打开对象
+	 * @param options 解析选项
+	 * @returns 路径对象或 undefined
+	 */
 	private async resolveOpenable(openable: IWindowOpenable, options: IPathResolveOptions = Object.create(null)): Promise<IPathToOpen | undefined> {
 
 		// handle file:// openables with some extra validation
@@ -1038,6 +1170,12 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return this.doResolveRemoteOpenable(openable, options);
 	}
 
+	/**
+	 * 解析远程可打开对象。
+	 * @param openable 可打开对象
+	 * @param options 解析选项
+	 * @returns 路径对象
+	 */
 	private doResolveRemoteOpenable(openable: IWindowOpenable, options: IPathResolveOptions): IPathToOpen<ITextEditorOptions> | undefined {
 		let uri = this.resourceFromOpenable(openable);
 
@@ -1073,6 +1211,11 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return { workspace: getSingleFolderWorkspaceIdentifier(uri), remoteAuthority };
 	}
 
+	/**
+	 * 从可打开对象获取资源 URI。
+	 * @param openable 可打开对象
+	 * @returns URI
+	 */
 	private resourceFromOpenable(openable: IWindowOpenable): URI {
 		if (isWorkspaceToOpen(openable)) {
 			return openable.workspaceUri;
@@ -1085,6 +1228,13 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return openable.fileUri;
 	}
 
+	/**
+	 * 解析本地文件路径，支持行列号、工作区、文件夹等。
+	 * @param path 路径
+	 * @param options 解析选项
+	 * @param skipHandleUNCError 跳过 UNC 错误处理
+	 * @returns 路径对象或 undefined
+	 */
 	private async doResolveFilePath(path: string, options: IPathResolveOptions, skipHandleUNCError?: boolean): Promise<IPathToOpen<ITextEditorOptions> | undefined> {
 
 		// Extract line/col information from path
@@ -1180,6 +1330,12 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return undefined;
 	}
 
+	/**
+	 * 处理 UNC 主机未允许时的弹窗与授权。
+	 * @param path 路径
+	 * @param options 解析选项
+	 * @returns 路径对象或 undefined
+	 */
 	private async onUNCHostNotAllowed(path: string, options: IPathResolveOptions): Promise<IPathToOpen<ITextEditorOptions> | undefined> {
 		const uri = URI.file(path);
 
@@ -1221,6 +1377,12 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return undefined;
 	}
 
+	/**
+	 * 解析远程路径，支持行列号、工作区、文件夹等。
+	 * @param path 路径
+	 * @param options 解析选项
+	 * @returns 路径对象
+	 */
 	private doResolveRemotePath(path: string, options: IPathResolveOptions): IPathToOpen<ITextEditorOptions> | undefined {
 		const first = path.charCodeAt(0);
 		const remoteAuthority = options.remoteAuthority;
@@ -1280,6 +1442,11 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return { workspace: getSingleFolderWorkspaceIdentifier(uri), remoteAuthority };
 	}
 
+	/**
+	 * 根据配置和参数，判断是否应新开窗口。
+	 * @param openConfig 打开配置
+	 * @returns 是否新开窗口的布尔值
+	 */
 	private shouldOpenNewWindow(openConfig: IOpenConfiguration): { openFolderInNewWindow: boolean; openFilesInNewWindow: boolean } {
 
 		// let the user settings override how folders are open in a new window or same window unless we are forced
@@ -1298,15 +1465,15 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			openFilesInNewWindow = !!openConfig.forceNewWindow && !openConfig.forceReuseWindow;
 		} else {
 
-			// macOS: by default we open files in a new window if this is triggered via DOCK context
+			// macOS：默认情况下，如果通过 DOCK 上下文触发，我们会在新窗口中打开文件
 			if (isMacintosh) {
 				if (openConfig.context === OpenContext.DOCK) {
 					openFilesInNewWindow = true;
 				}
 			}
 
-			// Linux/Windows: by default we open files in the new window unless triggered via DIALOG / MENU context
-			// or from the integrated terminal where we assume the user prefers to open in the current window
+			// Linux/Windows：默认情况下，我们在新窗口中打开文件，除非通过 DIALOG / MENU 上下文触发
+			// 或从集成终端触发，我们假定用户更喜欢在当前窗口中打开
 			else {
 				if (openConfig.context !== OpenContext.DIALOG && openConfig.context !== OpenContext.MENU && !(openConfig.userEnv && openConfig.userEnv['TERM_PROGRAM'] === 'vscode')) {
 					openFilesInNewWindow = true;
@@ -1322,6 +1489,12 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return { openFolderInNewWindow: !!openFolderInNewWindow, openFilesInNewWindow };
 	}
 
+	/**
+	 * 打开扩展开发主机窗口，避免重复。
+	 * @param extensionDevelopmentPaths 扩展开发路径
+	 * @param openConfig 打开配置
+	 * @returns 打开的窗口数组
+	 */
 	async openExtensionDevelopmentHostWindow(extensionDevelopmentPaths: string[], openConfig: IOpenConfiguration): Promise<ICodeWindow[]> {
 
 		// Reload an existing extension development host window on the same path
@@ -1429,6 +1602,11 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return this.open(openArgs);
 	}
 
+	/**
+	 * 实际创建或复用 Electron 窗口，并加载配置。
+	 * @param options 打开窗口选项
+	 * @returns 新建或复用的窗口
+	 */
 	private async openInBrowserWindow(options: IOpenBrowserWindowOptions): Promise<ICodeWindow> {
 		const windowConfig = this.configurationService.getValue<IWindowSettings | undefined>('window');
 
@@ -1445,11 +1623,11 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			}
 		}
 
-		// Build up the window configuration from provided options, config and environment
+		// 根据提供的选项、配置和环境构建窗口配置
 		const configuration: INativeWindowConfiguration = {
 
-			// Inherit CLI arguments from environment and/or
-			// the specific properties from this launch if provided
+			// 从环境和/或此次启动的特定属性
+			// 继承 CLI 参数（如果提供）
 			...this.environmentMainService.args,
 			...options.cli,
 
@@ -1464,18 +1642,18 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			appRoot: this.environmentMainService.appRoot,
 			execPath: process.execPath,
 			codeCachePath: this.environmentMainService.codeCachePath,
-			// If we know the backup folder upfront (for empty windows to restore), we can set it
-			// directly here which helps for restoring UI state associated with that window.
-			// For all other cases we first call into registerEmptyWindowBackup() to set it before
-			// loading the window.
+			// 如果我们预先知道备份文件夹（用于还原空窗口），我们可以
+			// 直接在这里设置它，这有助于还原与该窗口关联的 UI 状态。
+			// 对于所有其他情况，我们首先调用 registerEmptyWindowBackup()
+			// 在加载窗口之前设置它。
 			backupPath: options.emptyWindowBackupInfo ? join(this.environmentMainService.backupHome, options.emptyWindowBackupInfo.backupFolder) : undefined,
 
 			profiles: {
 				home: this.userDataProfilesMainService.profilesHome,
 				all: this.userDataProfilesMainService.profiles,
-				// Set to default profile first and resolve and update the profile
-				// only after the workspace-backup is registered.
-				// Because, workspace identifier of an empty window is known only then.
+				// 首先设置为默认配置文件，并在工作区备份注册后
+				// 才解析和更新配置文件。
+				// 因为空窗口的工作区标识符只有在那时才知道。
 				profile: defaultProfile
 			},
 
@@ -1556,7 +1734,7 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			disposables.add(createdWindow.onDidTriggerSystemContextMenu(({ x, y }) => this._onDidTriggerSystemContextMenu.fire({ window: createdWindow, x, y })));
 
 			const webContents = assertIsDefined(createdWindow.win?.webContents);
-			webContents.removeAllListeners('devtools-reload-page'); // remove built in listener so we can handle this on our own
+			webContents.removeAllListeners('devtools-reload-page'); // 移除内置侦听器，以便我们可以自己处理
 			disposables.add(Event.fromNodeEventEmitter(webContents, 'devtools-reload-page')(() => this.lifecycleMainService.reload(createdWindow)));
 
 			// Lifecycle
@@ -1566,8 +1744,9 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		// Existing window
 		else {
 
-			// Some configuration things get inherited if the window is being reused and we are
-			// in extension development host mode. These options are all development related.
+			// 如果窗口正在被重用，并且我们处于
+			// 扩展开发主机模式，一些配置项会被继承。
+			// 这些选项都与开发有关。
 			const currentWindowConfig = window.config;
 			if (!configuration.extensionDevelopmentPath && currentWindowConfig?.extensionDevelopmentPath) {
 				configuration.extensionDevelopmentPath = currentWindowConfig.extensionDevelopmentPath;
@@ -1605,11 +1784,17 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return window;
 	}
 
+	/**
+	 * 加载窗口配置并注册备份、配置文件等。
+	 * @param window 目标窗口
+	 * @param configuration 窗口配置
+	 * @param options 打开窗口选项
+	 * @param defaultProfile 默认配置文件
+	 */
 	private async doOpenInBrowserWindow(window: ICodeWindow, configuration: INativeWindowConfiguration, options: IOpenBrowserWindowOptions, defaultProfile: IUserDataProfile): Promise<void> {
 
-		// Register window for backups unless the window
-		// is for extension development, where we do not
-		// keep any backups.
+		// 注册窗口备份，除非窗口
+		// 用于扩展开发，我们不保留任何备份。
 
 		if (!configuration.extensionDevelopmentPath) {
 			if (isWorkspaceIdentifier(configuration.workspace)) {
@@ -1624,12 +1809,12 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 				});
 			} else {
 
-				// Empty windows are special in that they provide no workspace on
-				// their configuration. To properly register them with the backup
-				// service, we either use the provided associated `backupFolder`
-				// in case we restore a previously opened empty window or we have
-				// to generate a new empty window workspace identifier to be used
-				// as `backupFolder`.
+				// 空窗口特殊之处在于它们在配置中
+				// 不提供工作区。为了正确地将它们注册到备份
+				// 服务中，我们要么使用提供的关联 `backupFolder`
+				// （在恢复先前打开的空窗口的情况下），要么必须
+				// 生成一个新的空窗口工作区标识符，用作
+				// `backupFolder`。
 
 				configuration.backupPath = this.backupMainService.registerEmptyWindowBackup({
 					backupFolder: options.emptyWindowBackupInfo?.backupFolder ?? createEmptyWorkspaceIdentifier().id,
@@ -1644,9 +1829,9 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		configuration.profiles.profile = profile;
 
 		if (!configuration.extensionDevelopmentPath) {
-			// Associate the configured profile to the workspace
-			// unless the window is for extension development,
-			// where we do not persist the associations
+			// 将配置的配置文件关联到工作区
+			// 除非窗口用于扩展开发，
+			// 此时我们不会保留关联
 			await this.userDataProfilesMainService.setProfileForWorkspace(workspace, profile);
 		}
 
@@ -1654,6 +1839,13 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		window.load(configuration);
 	}
 
+	/**
+	 * 根据打开选项和工作区，解析应使用的用户数据配置文件。
+	 * @param options 打开窗口选项
+	 * @param workspace 工作区标识
+	 * @param defaultProfile 默认配置文件
+	 * @returns 用户数据配置文件
+	 */
 	private resolveProfileForBrowserWindow(options: IOpenBrowserWindowOptions, workspace: IAnyWorkspaceIdentifier, defaultProfile: IUserDataProfile): Promise<IUserDataProfile> | IUserDataProfile {
 		if (options.forceProfile) {
 			return this.userDataProfilesMainService.profiles.find(p => p.name === options.forceProfile) ?? this.userDataProfilesMainService.createNamedProfile(options.forceProfile);
@@ -1666,6 +1858,11 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return this.userDataProfilesMainService.getProfileForWorkspace(workspace) ?? defaultProfile;
 	}
 
+	/**
+	 * 窗口关闭时的清理和事件。
+	 * @param window 关闭的窗口
+	 * @param disposables 相关资源
+	 */
 	private onWindowClosed(window: ICodeWindow, disposables: IDisposable): void {
 
 		// Remove from our list so that Electron can clean it up
@@ -1678,6 +1875,10 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		disposables.dispose();
 	}
 
+	/**
+	 * 窗口销毁时的清理和事件。
+	 * @param window 销毁的窗口
+	 */
 	private onWindowDestroyed(window: ICodeWindow): void {
 
 		// Remove from our list so that Electron can clean it up
@@ -1687,6 +1888,10 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		this._onDidDestroyWindow.fire(window);
 	}
 
+	/**
+	 * 获取当前聚焦的窗口。
+	 * @returns 聚焦窗口或 undefined
+	 */
 	getFocusedWindow(): ICodeWindow | undefined {
 		const window = BrowserWindow.getFocusedWindow();
 		if (window) {
@@ -1696,30 +1901,60 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		return undefined;
 	}
 
+	/**
+	 * 获取最后一个活动窗口。
+	 * @returns 最后一个活动窗口或 undefined
+	 */
 	getLastActiveWindow(): ICodeWindow | undefined {
 		return this.doGetLastActiveWindow(this.getWindows());
 	}
 
+	/**
+	 * 获取指定远程授权下的最后一个活动窗口。
+	 * @param remoteAuthority 远程授权
+	 * @returns 最后一个活动窗口或 undefined
+	 */
 	private getLastActiveWindowForAuthority(remoteAuthority: string | undefined): ICodeWindow | undefined {
 		return this.doGetLastActiveWindow(this.getWindows().filter(window => isEqualAuthority(window.remoteAuthority, remoteAuthority)));
 	}
 
+	/**
+	 * 获取窗口列表中的最后一个活动窗口。
+	 * @param windows 窗口列表
+	 * @returns 最后一个活动窗口或 undefined
+	 */
 	private doGetLastActiveWindow(windows: ICodeWindow[]): ICodeWindow | undefined {
 		return getLastFocused(windows);
 	}
 
+	/**
+	 * 向聚焦窗口发送消息。
+	 * @param channel 通道名
+	 * @param args 参数
+	 */
 	sendToFocused(channel: string, ...args: any[]): void {
 		const focusedWindow = this.getFocusedWindow() || this.getLastActiveWindow();
 
 		focusedWindow?.sendWhenReady(channel, CancellationToken.None, ...args);
 	}
 
+	/**
+	 * 向即将打开的窗口发送消息。
+	 * @param channel 通道名
+	 * @param args 参数
+	 */
 	sendToOpeningWindow(channel: string, ...args: any[]): void {
 		this._register(Event.once(this.onDidSignalReadyWindow)(window => {
 			window.sendWhenReady(channel, CancellationToken.None, ...args);
 		}));
 	}
 
+	/**
+	 * 向所有窗口发送消息。
+	 * @param channel 通道名
+	 * @param payload 负载
+	 * @param windowIdsToIgnore 忽略的窗口 ID
+	 */
 	sendToAll(channel: string, payload?: any, windowIdsToIgnore?: number[]): void {
 		for (const window of this.getWindows()) {
 			if (windowIdsToIgnore && windowIdsToIgnore.indexOf(window.id) >= 0) {
@@ -1730,18 +1965,36 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		}
 	}
 
+	/**
+	 * 获取所有窗口。
+	 * @returns 窗口数组
+	 */
 	getWindows(): ICodeWindow[] {
 		return Array.from(this.windows.values());
 	}
 
+	/**
+	 * 获取窗口数量。
+	 * @returns 窗口数量
+	 */
 	getWindowCount(): number {
 		return this.windows.size;
 	}
 
+	/**
+	 * 通过窗口 ID 获取窗口。
+	 * @param windowId 窗口 ID
+	 * @returns 窗口或 undefined
+	 */
 	getWindowById(windowId: number): ICodeWindow | undefined {
 		return this.windows.get(windowId);
 	}
 
+	/**
+	 * 通过 WebContents 获取窗口。
+	 * @param webContents WebContents 对象
+	 * @returns 窗口或 undefined
+	 */
 	getWindowByWebContents(webContents: WebContents): ICodeWindow | undefined {
 		const browserWindow = BrowserWindow.fromWebContents(webContents);
 		if (!browserWindow) {

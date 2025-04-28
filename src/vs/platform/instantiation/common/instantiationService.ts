@@ -28,6 +28,11 @@ class CyclicDependencyError extends Error {
 	}
 }
 
+/**
+ * 实例化服务
+ *
+ * 主要目的是实现 VSCode 依赖注入（DI）框架的核心实例化服务，负责创建、管理和销毁所有服务实例，并处理服务之间的依赖关系。它是 VSCode 平台中服务注册与实例化的关键基础设施
+ */
 export class InstantiationService implements IInstantiationService {
 
 	declare readonly _serviceBrand: undefined;

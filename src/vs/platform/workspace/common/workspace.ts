@@ -134,12 +134,22 @@ export interface IEmptyWorkspaceIdentifier extends IBaseWorkspaceIdentifier { }
 
 export type IAnyWorkspaceIdentifier = IWorkspaceIdentifier | ISingleFolderWorkspaceIdentifier | IEmptyWorkspaceIdentifier;
 
+/**
+ * 判断对象是否为单文件夹工作区标识符。
+ * @param obj 对象
+ * @returns 是否为单文件夹工作区标识符
+ */
 export function isSingleFolderWorkspaceIdentifier(obj: unknown): obj is ISingleFolderWorkspaceIdentifier {
 	const singleFolderIdentifier = obj as ISingleFolderWorkspaceIdentifier | undefined;
 
 	return typeof singleFolderIdentifier?.id === 'string' && URI.isUri(singleFolderIdentifier.uri);
 }
 
+/**
+ * 判断对象是否为空工作区标识符。
+ * @param obj 对象
+ * @returns 是否为空工作区标识符
+ */
 export function isEmptyWorkspaceIdentifier(obj: unknown): obj is IEmptyWorkspaceIdentifier {
 	const emptyWorkspaceIdentifier = obj as IEmptyWorkspaceIdentifier | undefined;
 	return typeof emptyWorkspaceIdentifier?.id === 'string'

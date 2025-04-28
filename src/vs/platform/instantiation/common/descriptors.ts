@@ -3,6 +3,12 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+/**
+ * 同步描述符
+ *
+ * 用于描述一个类及其静态参数，并决定是否支持延迟实例化。
+ * @param T 类型
+ */
 export class SyncDescriptor<T> {
 
 	readonly ctor: any;

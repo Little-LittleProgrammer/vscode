@@ -880,6 +880,15 @@ export class CodeApplication extends Disposable {
 		}
 
 		let shouldOpenInNewWindow = false;
+		const params = new URLSearchParams(uri.query);
+		if (params.get('windowId') === '_blank') {
+			this.logService.trace(`app#handleProtocolUrl() found 'windowId=_blank' as parameter, setting shouldOpenInNewWindow=true:`, uri.toString(true));
+
+			params.delete('windowId');
+			uri = uri.with({ query: params.toString() });
+
+			shouldOpenInNewWindow = true;
+		}
 
 		// 或者如果没有窗口打开 (仅限 macOS)
 		else if (isMacintosh && windowsMainService.getWindowCount() === 0) {
@@ -1001,7 +1010,8 @@ export class CodeApplication extends Disposable {
 		const dialogMainService = new DialogMainService(this.logService, this.productService);
 		services.set(IDialogMainService, dialogMainService);
 
-		// 启动
+		// 启动，VSCode 主进程的启动流程管理，处理从命令行或其他实例传递过来的参数
+		// 1. 初始化 openConfig
 		services.set(ILaunchMainService, new SyncDescriptor(LaunchMainService, undefined, false /* 代理到其他进程 */));
 
 		// 诊断
