@@ -1,6 +1,7 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *  文件主要作用：实现了VSCode窗口管理的核心类，包括BaseWindow基类和CodeWindow具体实现，负责窗口的创建、加载、状态管理、消息通信等
+ *  Copyright (c) Microsoft Corporation. 保留所有权利。
+ *  使用MIT许可证。有关许可信息，请参阅项目根目录中的License.txt。
  *--------------------------------------------------------------------------------------------*/
 
 import electron, { BrowserWindowConstructorOptions } from 'electron';
@@ -61,31 +62,33 @@ interface ILoadOptions {
 	readonly disableExtensions?: boolean;
 }
 
+/**
+ * 窗口就绪状态枚举
+ */
 const enum ReadyState {
 
 	/**
-	 * This window has not loaded anything yet
-	 * and this is the initial state of every
-	 * window.
+	 * 此窗口尚未加载任何内容，
+	 * 这是每个窗口的初始状态。
 	 */
 	NONE,
 
 	/**
-	 * This window is navigating, either for the
-	 * first time or subsequent times.
+	 * 此窗口正在导航中，可能是首次
+	 * 导航或后续导航。
 	 */
 	NAVIGATING,
 
 	/**
-	 * This window has finished loading and is ready
-	 * to forward IPC requests to the web contents.
+	 * 此窗口已完成加载并已准备好
+	 * 将IPC请求转发到Web内容。
 	 */
 	READY
 }
 
 export abstract class BaseWindow extends Disposable implements IBaseWindow {
 
-	//#region Events
+	//#region 事件
 
 	private readonly _onDidClose = this._register(new Emitter<void>());
 	readonly onDidClose = this._onDidClose.event;
@@ -109,7 +112,7 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 
 	abstract readonly id: number;
 
-	protected _lastFocusTime = Date.now(); // window is shown on creation so take current time
+	protected _lastFocusTime = Date.now(); // 窗口在创建时显示，因此取当前时间
 	get lastFocusTime(): number { return this._lastFocusTime; }
 
 	protected _win: electron.BrowserWindow | null = null;
@@ -117,7 +120,7 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 	protected setWin(win: electron.BrowserWindow, options?: BrowserWindowConstructorOptions): void {
 		this._win = win;
 
-		// Window Events
+		// 窗口事件
 		this._register(Event.fromNodeEventEmitter(win, 'maximize')(() => this._onDidMaximize.fire()));
 		this._register(Event.fromNodeEventEmitter(win, 'unmaximize')(() => this._onDidUnmaximize.fire()));
 		this._register(Event.fromNodeEventEmitter(win, 'closed')(() => {
@@ -342,18 +345,26 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 
 	//#endregion
 
-	//#region Fullscreen
+	//#region 全屏
 
 	private transientIsNativeFullScreen: boolean | undefined = undefined;
 	private joinNativeFullScreenTransition: DeferredPromise<boolean> | undefined = undefined;
 
+	/**
+	 * 切换全屏状态
+	 */
 	toggleFullScreen(): void {
 		this.setFullScreen(!this.isFullScreen, false);
 	}
 
+	/**
+	 * 设置窗口的全屏状态
+	 * @param fullscreen 是否进入全屏模式
+	 * @param fromRestore 是否从恢复状态触发
+	 */
 	protected setFullScreen(fullscreen: boolean, fromRestore: boolean): void {
 
-		// Set fullscreen state
+		// 设置全屏状态
 		if (useNativeFullScreen(this.configurationService)) {
 			this.setNativeFullScreen(fullscreen, fromRestore);
 		} else {
@@ -361,6 +372,9 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 		}
 	}
 
+	/**
+	 * 获取窗口是否处于全屏状态
+	 */
 	get isFullScreen(): boolean {
 		if (isMacintosh && typeof this.transientIsNativeFullScreen === 'boolean') {
 			return this.transientIsNativeFullScreen;
@@ -373,6 +387,9 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 		return Boolean(isFullScreen || isSimpleFullScreen);
 	}
 
+	/**
+	 * 设置原生全屏模式
+	 */
 	private setNativeFullScreen(fullscreen: boolean, fromRestore: boolean): void {
 		const win = this.win;
 		if (win?.isSimpleFullScreen()) {
@@ -382,14 +399,16 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 		this.doSetNativeFullScreen(fullscreen, fromRestore);
 	}
 
+	/**
+	 * 执行原生全屏模式切换
+	 */
 	private doSetNativeFullScreen(fullscreen: boolean, fromRestore: boolean): void {
 		if (isMacintosh) {
 
-			// macOS: Electron windows report `false` for `isFullScreen()` for as long
-			// as the fullscreen transition animation takes place. As such, we need to
-			// listen to the transition events and carry around an intermediate state
-			// for knowing if we are in fullscreen or not
-			// Refs: https://github.com/electron/electron/issues/35360
+			// macOS: Electron窗口在全屏转换动画进行期间会为`isFullScreen()`
+			// 报告`false`。因此，我们需要监听转换事件并维护一个中间状态
+			// 以了解我们是否处于全屏模式
+			// 参考: https://github.com/electron/electron/issues/35360
 
 			this.transientIsNativeFullScreen = fullscreen;
 
@@ -401,31 +420,30 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 				]);
 
 				if (this.joinNativeFullScreenTransition !== joinNativeFullScreenTransition) {
-					return; // another transition was requested later
+					return; // 稍后请求了另一个转换
 				}
 
 				this.transientIsNativeFullScreen = undefined;
 				this.joinNativeFullScreenTransition = undefined;
 
-				// There is one interesting gotcha on macOS: when you are opening a new
-				// window from a fullscreen window, that new window will immediately
-				// open fullscreen and emit the `enter-full-screen` event even before we
-				// reach this method. In that case, we actually will timeout after 10s
-				// for detecting the transition and as such it is important that we only
-				// signal to leave fullscreen if the window reports as not being in fullscreen.
+				// macOS上有一个有趣的问题：当你从一个全屏窗口打开一个新窗口时，
+				// 新窗口会立即以全屏模式打开，并在我们到达此方法之前就触发
+				// `enter-full-screen`事件。在这种情况下，我们实际上会在10秒后
+				// 超时检测转换，因此重要的是我们只在窗口报告不处于全屏模式时
+				// 发出退出全屏的信号。
 
 				if (!transitioned && fullscreen && fromRestore && this.win && !this.win.isFullScreen()) {
 
-					// We have seen requests for fullscreen failing eventually after some
-					// time, for example when an OS update was performed and windows restore.
-					// In those cases a user would find a window that is not in fullscreen
-					// but also does not show any custom titlebar (and thus window controls)
-					// because we think the window is in fullscreen.
+					// 我们见过全屏请求最终在一段时间后失败的情况，
+					// 例如当执行操作系统更新并恢复窗口时。
+					// 在这些情况下，用户会发现一个既不处于全屏状态
+					// 也不显示任何自定义标题栏（因此没有窗口控件）的窗口，
+					// 因为我们认为窗口处于全屏状态。
 					//
-					// As a workaround in that case we emit a warning and leave fullscreen
-					// so that at least the window controls are back.
+					// 在这种情况下，我们会发出警告并退出全屏模式，
+					// 以便至少恢复窗口控件。
 
-					this.logService.warn('window: native macOS fullscreen transition did not happen within 10s from restoring');
+					this.logService.warn('window: 从恢复状态触发的macOS原生全屏转换在10秒内未完成');
 
 					this._onDidLeaveFullScreen.fire();
 				}
@@ -436,6 +454,9 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 		win?.setFullScreen(fullscreen);
 	}
 
+	/**
+	 * 设置简单全屏模式
+	 */
 	private setSimpleFullScreen(fullscreen: boolean): void {
 		const win = this.win;
 		if (win?.isFullScreen()) {
@@ -443,7 +464,7 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 		}
 
 		win?.setSimpleFullScreen(fullscreen);
-		win?.webContents.focus(); // workaround issue where focus is not going into window
+		win?.webContents.focus(); // 解决焦点无法进入窗口的问题
 	}
 
 	//#endregion
@@ -457,9 +478,15 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 	}
 }
 
+/**
+ * VSCode 窗口管理系统的核心实现，负责处理窗口的创建、配置、生命周期管理、错误处理、状态保存/恢复等重要功能。所有涉及到 VSCode 窗口显示和管理的核心逻辑都在这个文件中实现
+ * BaseWindow 抽象类：实现了 VSCode 窗口管理的基础功能，包括窗口状态、全屏切换、事件处理等
+ * CodeWindow 类：继承自 BaseWindow，实现了 VSCode 代码窗口的具体功能，包括加载配置、处理错误、管理生命周期等
+ * UnresponsiveError 类：用于处理窗口无响应情况的错误类
+ */
 export class CodeWindow extends BaseWindow implements ICodeWindow {
 
-	//#region Events
+	//#region 事件
 
 	private readonly _onWillLoad = this._register(new Emitter<ILoadEvent>());
 	readonly onWillLoad = this._onWillLoad.event;
@@ -473,7 +500,7 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 	//#endregion
 
 
-	//#region Properties
+	//#region 属性
 
 	private _id: number;
 	get id(): number { return this._id; }
@@ -617,35 +644,47 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 
 	private readyState = ReadyState.NONE;
 
+	/**
+	 * 设置窗口就绪状态
+	 */
 	setReady(): void {
-		this.logService.trace(`window#load: window reported ready (id: ${this._id})`);
+		this.logService.trace(`window#load: 窗口报告已就绪 (id: ${this._id})`);
 
 		this.readyState = ReadyState.READY;
 
-		// inform all waiting promises that we are ready now
+		// 通知所有等待的promise我们现在已就绪
 		while (this.whenReadyCallbacks.length) {
 			this.whenReadyCallbacks.pop()!(this);
 		}
 
-		// Events
+		// 触发事件
 		this._onDidSignalReady.fire();
 	}
 
+	/**
+	 * 返回一个Promise，当窗口就绪时解析
+	 */
 	ready(): Promise<ICodeWindow> {
 		return new Promise<ICodeWindow>(resolve => {
 			if (this.isReady) {
 				return resolve(this);
 			}
 
-			// otherwise keep and call later when we are ready
+			// 否则保存回调并在就绪时调用
 			this.whenReadyCallbacks.push(resolve);
 		});
 	}
 
+	/**
+	 * 窗口是否已就绪
+	 */
 	get isReady(): boolean {
 		return this.readyState === ReadyState.READY;
 	}
 
+	/**
+	 * 返回一个Promise，当窗口关闭或加载时解析
+	 */
 	get whenClosedOrLoaded(): Promise<void> {
 		return new Promise<void>(resolve => {
 
@@ -740,6 +779,9 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		return this.marketplaceHeadersPromise;
 	}
 
+	/**
+	 * 处理窗口错误
+	 */
 	private async onWindowError(error: WindowError.UNRESPONSIVE): Promise<void>;
 	private async onWindowError(error: WindowError.RESPONSIVE): Promise<void>;
 	private async onWindowError(error: WindowError.PROCESS_GONE, details: { reason: string; exitCode: number }): Promise<void>;
@@ -748,26 +790,26 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 
 		switch (type) {
 			case WindowError.PROCESS_GONE:
-				this.logService.error(`CodeWindow: renderer process gone (reason: ${details?.reason || '<unknown>'}, code: ${details?.exitCode || '<unknown>'})`);
+				this.logService.error(`CodeWindow: 渲染进程已终止 (原因: ${details?.reason || '<未知>'}, 代码: ${details?.exitCode || '<未知>'})`);
 				break;
 			case WindowError.UNRESPONSIVE:
-				this.logService.error('CodeWindow: detected unresponsive');
+				this.logService.error('CodeWindow: 检测到无响应');
 				break;
 			case WindowError.RESPONSIVE:
-				this.logService.error('CodeWindow: recovered from unresponsive');
+				this.logService.error('CodeWindow: 从无响应状态恢复');
 				break;
 			case WindowError.LOAD:
-				this.logService.error(`CodeWindow: failed to load (reason: ${details?.reason || '<unknown>'}, code: ${details?.exitCode || '<unknown>'})`);
+				this.logService.error(`CodeWindow: 加载失败 (原因: ${details?.reason || '<未知>'}, 代码: ${details?.exitCode || '<未知>'})`);
 				break;
 		}
 
-		// Telemetry
+		// 遥测
 		type WindowErrorClassification = {
-			type: { classification: 'SystemMetaData'; purpose: 'PerformanceAndHealth'; comment: 'The type of window error to understand the nature of the error better.' };
-			reason: { classification: 'SystemMetaData'; purpose: 'PerformanceAndHealth'; comment: 'The reason of the window error to understand the nature of the error better.' };
-			code: { classification: 'SystemMetaData'; purpose: 'PerformanceAndHealth'; comment: 'The exit code of the window process to understand the nature of the error better' };
+			type: { classification: 'SystemMetaData'; purpose: 'PerformanceAndHealth'; comment: '窗口错误的类型，以便更好地理解错误的性质。' };
+			reason: { classification: 'SystemMetaData'; purpose: 'PerformanceAndHealth'; comment: '窗口错误的原因，以便更好地理解错误的性质。' };
+			code: { classification: 'SystemMetaData'; purpose: 'PerformanceAndHealth'; comment: '窗口进程的退出代码，以便更好地理解错误的性质' };
 			owner: 'bpasero';
-			comment: 'Provides insight into reasons the vscode window had an error.';
+			comment: '提供对vscode窗口发生错误原因的洞察。';
 		};
 		type WindowErrorEvent = {
 			type: WindowError;
@@ -780,93 +822,93 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			code: details?.exitCode
 		});
 
-		// Inform User if non-recoverable
+		// 如果无法恢复，通知用户
 		switch (type) {
 			case WindowError.UNRESPONSIVE:
 			case WindowError.PROCESS_GONE:
 
-				// If we run extension tests from CLI, we want to signal
-				// back this state to the test runner by exiting with a
-				// non-zero exit code.
+				// 如果我们从CLI运行扩展测试，我们想通过
+				// 以非零退出代码退出来向测试运行器发送
+				// 此状态的信号。
 				if (this.isExtensionDevelopmentTestFromCli) {
 					this.lifecycleMainService.kill(1);
 					return;
 				}
 
-				// If we run smoke tests, want to proceed with an orderly
-				// shutdown as much as possible by destroying the window
-				// and then calling the normal `quit` routine.
+				// 如果我们运行冒烟测试，我们希望尽可能有序地
+				// 关闭，方法是销毁窗口，然后调用正常的
+				// 'quit'程序。
 				if (this.environmentMainService.args['enable-smoke-test-driver']) {
 					await this.destroyWindow(false, false);
-					this.lifecycleMainService.quit(); // still allow for an orderly shutdown
+					this.lifecycleMainService.quit(); // 仍允许有序关闭
 					return;
 				}
 
-				// Unresponsive
+				// 无响应
 				if (type === WindowError.UNRESPONSIVE) {
 					if (this.isExtensionDevelopmentHost || this.isExtensionTestHost || (this._win && this._win.webContents && this._win.webContents.isDevToolsOpened())) {
-						// TODO@electron Workaround for https://github.com/microsoft/vscode/issues/56994
-						// In certain cases the window can report unresponsiveness because a breakpoint was hit
-						// and the process is stopped executing. The most typical cases are:
-						// - devtools are opened and debugging happens
-						// - window is an extensions development host that is being debugged
-						// - window is an extension test development host that is being debugged
+						// TODO@electron 解决 https://github.com/microsoft/vscode/issues/56994 的问题
+						// 在某些情况下，窗口可能会报告无响应，因为遇到了断点
+						// 且进程停止执行。最典型的情况是：
+						// - 开发者工具已打开并且正在调试
+						// - 窗口是正在被调试的扩展开发主机
+						// - 窗口是正在被调试的扩展测试开发主机
 						return;
 					}
 
-					// Interrupt V8 and collect JavaScript stack
+					// 中断V8并收集JavaScript堆栈
 					this.jsCallStackCollector.trigger(() => this.startCollectingJScallStacks());
-					// Stack collection will stop under any of the following conditions:
-					// - The window becomes responsive again
-					// - The window is destroyed i-e reopen or closed
-					// - sampling period is complete, default is 15s
+					// 在以下任一条件下，堆栈收集将停止：
+					// - 窗口再次变为响应状态
+					// - 窗口被销毁，即重新打开或关闭
+					// - 采样周期完成，默认为15秒
 					this.jsCallStackCollectorStopScheduler.schedule();
 
-					// Show Dialog
+					// 显示对话框
 					const { response, checkboxChecked } = await this.dialogMainService.showMessageBox({
 						type: 'warning',
 						buttons: [
-							localize({ key: 'reopen', comment: ['&& denotes a mnemonic'] }, "&&Reopen"),
-							localize({ key: 'close', comment: ['&& denotes a mnemonic'] }, "&&Close"),
-							localize({ key: 'wait', comment: ['&& denotes a mnemonic'] }, "&&Keep Waiting")
+							localize({ key: 'reopen', comment: ['&& denotes a mnemonic'] }, "&&重新打开"),
+							localize({ key: 'close', comment: ['&& denotes a mnemonic'] }, "&&关闭"),
+							localize({ key: 'wait', comment: ['&& denotes a mnemonic'] }, "&&继续等待")
 						],
-						message: localize('appStalled', "The window is not responding"),
-						detail: localize('appStalledDetail', "You can reopen or close the window or keep waiting."),
-						checkboxLabel: this._config?.workspace ? localize('doNotRestoreEditors', "Don't restore editors") : undefined
+						message: localize('appStalled', "窗口没有响应"),
+						detail: localize('appStalledDetail', "您可以重新打开或关闭窗口，或继续等待。"),
+						checkboxLabel: this._config?.workspace ? localize('doNotRestoreEditors', "不要恢复编辑器") : undefined
 					}, this._win);
 
-					// Handle choice
-					if (response !== 2 /* keep waiting */) {
+					// 处理选择
+					if (response !== 2 /* 继续等待 */) {
 						const reopen = response === 0;
 						this.stopCollectingJScallStacks();
 						await this.destroyWindow(reopen, checkboxChecked);
 					}
 				}
 
-				// Process gone
+				// 进程已终止
 				else if (type === WindowError.PROCESS_GONE) {
 					let message: string;
 					if (!details) {
-						message = localize('appGone', "The window terminated unexpectedly");
+						message = localize('appGone', "窗口意外终止");
 					} else {
-						message = localize('appGoneDetails', "The window terminated unexpectedly (reason: '{0}', code: '{1}')", details.reason, details.exitCode ?? '<unknown>');
+						message = localize('appGoneDetails', "窗口意外终止 (原因: '{0}', 代码: '{1}')", details.reason, details.exitCode ?? '<未知>');
 					}
 
-					// Show Dialog
+					// 显示对话框
 					const { response, checkboxChecked } = await this.dialogMainService.showMessageBox({
 						type: 'warning',
 						buttons: [
-							this._config?.workspace ? localize({ key: 'reopen', comment: ['&& denotes a mnemonic'] }, "&&Reopen") : localize({ key: 'newWindow', comment: ['&& denotes a mnemonic'] }, "&&New Window"),
-							localize({ key: 'close', comment: ['&& denotes a mnemonic'] }, "&&Close")
+							this._config?.workspace ? localize({ key: 'reopen', comment: ['&& denotes a mnemonic'] }, "&&重新打开") : localize({ key: 'newWindow', comment: ['&& denotes a mnemonic'] }, "&&新窗口"),
+							localize({ key: 'close', comment: ['&& denotes a mnemonic'] }, "&&关闭")
 						],
 						message,
 						detail: this._config?.workspace ?
-							localize('appGoneDetailWorkspace', "We are sorry for the inconvenience. You can reopen the window to continue where you left off.") :
-							localize('appGoneDetailEmptyWindow', "We are sorry for the inconvenience. You can open a new empty window to start again."),
-						checkboxLabel: this._config?.workspace ? localize('doNotRestoreEditors', "Don't restore editors") : undefined
+							localize('appGoneDetailWorkspace', "我们对造成的不便表示歉意。您可以重新打开窗口以继续您离开时的工作。") :
+							localize('appGoneDetailEmptyWindow', "我们对造成的不便表示歉意。您可以打开一个新的空窗口重新开始。"),
+						checkboxLabel: this._config?.workspace ? localize('doNotRestoreEditors', "不要恢复编辑器") : undefined
 					}, this._win);
 
-					// Handle choice
+					// 处理选择
 					const reopen = response === 0;
 					await this.destroyWindow(reopen, checkboxChecked);
 				}
@@ -877,10 +919,15 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		}
 	}
 
+	/**
+	 * 销毁窗口
+	 * @param reopen 是否重新打开窗口
+	 * @param skipRestoreEditors 是否跳过恢复编辑器状态
+	 */
 	private async destroyWindow(reopen: boolean, skipRestoreEditors: boolean): Promise<void> {
 		const workspace = this._config?.workspace;
 
-		// check to discard editor state first
+		// 首先检查是否丢弃编辑器状态
 		if (skipRestoreEditors && workspace) {
 			try {
 				const workspaceStorage = this.storageMainService.workspaceStorage(workspace);
@@ -892,14 +939,14 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			}
 		}
 
-		// 'close' event will not be fired on destroy(), so signal crash via explicit event
+		// 在destroy()上不会触发'close'事件，因此通过显式事件发出崩溃信号
 		this._onDidDestroy.fire();
 
 		try {
-			// ask the windows service to open a new fresh window if specified
+			// 如果指定了，请求窗口服务打开一个新的窗口
 			if (reopen && this._config) {
 
-				// We have to reconstruct a openable from the current workspace
+				// 我们必须从当前工作区重建可打开项
 				let uriToOpen: IWorkspaceToOpen | IFolderToOpen | undefined = undefined;
 				let forceEmpty = undefined;
 				if (isSingleFolderWorkspaceIdentifier(workspace)) {
@@ -910,13 +957,13 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 					forceEmpty = true;
 				}
 
-				// Delegate to windows service
+				// 委托给窗口服务
 				const window = (await this.windowsMainService.open({
 					context: OpenContext.API,
 					userEnv: this._config.userEnv,
 					cli: {
 						...this.environmentMainService.args,
-						_: [] // we pass in the workspace to open explicitly via `urisToOpen`
+						_: [] // 我们通过`urisToOpen`显式传递要打开的工作区
 					},
 					urisToOpen: uriToOpen ? [uriToOpen] : undefined,
 					forceEmpty,
@@ -926,9 +973,8 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 				window?.focus();
 			}
 		} finally {
-			// make sure to destroy the window as its renderer process is gone. do this
-			// after the code for reopening the window, to prevent the entire application
-			// from quitting when the last window closes as a result.
+			// 确保销毁窗口，因为其渲染进程已终止。在重新打开窗口的代码之后
+			// 执行此操作，以防止当最后一个窗口关闭时整个应用程序退出。
 			this._win?.destroy();
 		}
 	}
@@ -993,17 +1039,20 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		}
 	}
 
+	/**
+	 * 加载窗口配置
+	 */
 	load(configuration: INativeWindowConfiguration, options: ILoadOptions = Object.create(null)): void {
-		this.logService.trace(`window#load: attempt to load window (id: ${this._id})`);
+		this.logService.trace(`window#load: 尝试加载窗口 (id: ${this._id})`);
 
-		// Clear Document Edited if needed
+		// 如果需要，清除文档已编辑状态
 		if (this.isDocumentEdited()) {
 			if (!options.isReload || !this.backupMainService.isHotExitEnabled()) {
 				this.setDocumentEdited(false);
 			}
 		}
 
-		// Clear Title and Filename if needed
+		// 如果需要，清除标题和文件名
 		if (!options.isReload) {
 			if (this.getRepresentedFilename()) {
 				this.setRepresentedFilename('');
@@ -1012,36 +1061,36 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			this._win.setTitle(this.productService.nameLong);
 		}
 
-		// Update configuration values based on our window context
-		// and set it into the config object URL for usage.
+		// 根据窗口上下文更新配置值
+		// 并将其设置到配置对象URL中以供使用
 		this.updateConfiguration(configuration, options);
 
-		// If this is the first time the window is loaded, we associate the paths
-		// directly with the window because we assume the loading will just work
+		// 如果这是窗口首次加载，我们直接将路径
+		// 与窗口关联，因为我们假设加载会正常工作
 		if (this.readyState === ReadyState.NONE) {
 			this._config = configuration;
 		}
 
-		// Otherwise, the window is currently showing a folder and if there is an
-		// unload handler preventing the load, we cannot just associate the paths
-		// because the loading might be vetoed. Instead we associate it later when
-		// the window load event has fired.
+		// 否则，窗口当前正在显示一个文件夹，如果有一个
+		// 防止加载的卸载处理程序，我们不能直接关联路径，
+		// 因为加载可能会被否决。相反，我们在窗口加载事件
+		// 触发后再关联它。
 		else {
 			this.pendingLoadConfig = configuration;
 		}
 
-		// Indicate we are navigting now
+		// 指示我们现在正在导航
 		this.readyState = ReadyState.NAVIGATING;
 
-		// Load URL
+		// 加载URL
 		this._win.loadURL(FileAccess.asBrowserUri(`vs/code/electron-sandbox/workbench/workbench${this.environmentMainService.isBuilt ? '' : '-dev'}.html`).toString(true));
 
-		// Remember that we did load
+		// 记住我们已经加载
 		const wasLoaded = this.wasLoaded;
 		this.wasLoaded = true;
 
-		// Make window visible if it did not open in N seconds because this indicates an error
-		// Only do this when running out of sources and not when running tests
+		// 如果窗口在N秒内没有打开，则使其可见，因为这表明有错误
+		// 仅在从源代码运行而不是运行测试时执行此操作
 		if (!this.environmentMainService.isBuilt && !this.environmentMainService.extensionTestsLocationURI) {
 			this._register(new RunOnceScheduler(() => {
 				if (this._win && !this._win.isVisible() && !this._win.isMinimized()) {
@@ -1052,49 +1101,52 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			}, 10000)).schedule();
 		}
 
-		// Event
+		// 触发事件
 		this._onWillLoad.fire({ workspace: configuration.workspace, reason: options.isReload ? LoadReason.RELOAD : wasLoaded ? LoadReason.LOAD : LoadReason.INITIAL });
 	}
 
+	/**
+	 * 更新窗口配置
+	 */
 	private updateConfiguration(configuration: INativeWindowConfiguration, options: ILoadOptions): void {
 
-		// If this window was loaded before from the command line
-		// (as indicated by VSCODE_CLI environment), make sure to
-		// preserve that user environment in subsequent loads,
-		// unless the new configuration context was also a CLI
-		// (for https://github.com/microsoft/vscode/issues/108571)
-		// Also, preserve the environment if we're loading from an
-		// extension development host that had its environment set
-		// (for https://github.com/microsoft/vscode/issues/123508)
+		// 如果此窗口之前是从命令行加载的
+		// （如VSCODE_CLI环境所示），请确保
+		// 在后续加载中保留该用户环境，
+		// 除非新的配置上下文也是CLI
+		// （用于 https://github.com/microsoft/vscode/issues/108571）
+		// 另外，如果我们正在从设置了环境的扩展开发主机加载，
+		// 也保留环境
+		// （用于 https://github.com/microsoft/vscode/issues/123508）
 		const currentUserEnv = (this._config ?? this.pendingLoadConfig)?.userEnv;
 		if (currentUserEnv) {
 			const shouldPreserveLaunchCliEnvironment = isLaunchedFromCli(currentUserEnv) && !isLaunchedFromCli(configuration.userEnv);
 			const shouldPreserveDebugEnvironmnet = this.isExtensionDevelopmentHost;
 			if (shouldPreserveLaunchCliEnvironment || shouldPreserveDebugEnvironmnet) {
-				configuration.userEnv = { ...currentUserEnv, ...configuration.userEnv }; // still allow to override certain environment as passed in
+				configuration.userEnv = { ...currentUserEnv, ...configuration.userEnv }; // 仍然允许覆盖传入的某些环境
 			}
 		}
 
-		// If named pipe was instantiated for the crashpad_handler process, reuse the same
-		// pipe for new app instances connecting to the original app instance.
-		// Ref: https://github.com/microsoft/vscode/issues/115874
+		// 如果为crashpad_handler进程实例化了命名管道，为连接到原始应用实例的
+		// 新应用实例重用相同的管道。
+		// 参考: https://github.com/microsoft/vscode/issues/115874
 		if (process.env['CHROME_CRASHPAD_PIPE_NAME']) {
 			Object.assign(configuration.userEnv, {
 				CHROME_CRASHPAD_PIPE_NAME: process.env['CHROME_CRASHPAD_PIPE_NAME']
 			});
 		}
 
-		// Add disable-extensions to the config, but do not preserve it on currentConfig or
-		// pendingLoadConfig so that it is applied only on this load
+		// 将disable-extensions添加到配置中，但不在currentConfig或
+		// pendingLoadConfig上保留它，以便它仅在此次加载时应用
 		if (options.disableExtensions !== undefined) {
 			configuration['disable-extensions'] = options.disableExtensions;
 		}
 
-		// Update window related properties
+		// 更新窗口相关属性
 		try {
 			configuration.handle = VSBuffer.wrap(this._win.getNativeWindowHandle());
 		} catch (error) {
-			this.logService.error(`Error getting native window handle: ${error}`);
+			this.logService.error(`获取原生窗口句柄时出错: ${error}`);
 		}
 		configuration.fullscreen = this.isFullScreen;
 		configuration.maximized = this._win.isMaximized();
@@ -1105,30 +1157,33 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			configuration.partsSplash.zoomLevel = configuration.zoomLevel;
 		}
 
-		// Update with latest perf marks
+		// 使用最新的性能标记更新
 		mark('code/willOpenNewWindow');
 		configuration.perfMarks = getMarks();
 
-		// Update in config object URL for usage in renderer
+		// 在配置对象URL中更新以供渲染器使用
 		this.configObjectUrl.update(configuration);
 	}
 
+	/**
+	 * 重新加载窗口
+	 */
 	async reload(cli?: NativeParsedArgs): Promise<void> {
 
-		// Copy our current config for reuse
+		// 复制当前配置以重用
 		const configuration = Object.assign({}, this._config);
 
-		// Validate workspace
+		// 验证工作区
 		configuration.workspace = await this.validateWorkspaceBeforeReload(configuration);
 
-		// Delete some properties we do not want during reload
+		// 删除我们不希望在重新加载期间存在的一些属性
 		delete configuration.filesToOpenOrCreate;
 		delete configuration.filesToDiff;
 		delete configuration.filesToMerge;
 		delete configuration.filesToWait;
 
-		// Some configuration things get inherited if the window is being reloaded and we are
-		// in extension development mode. These options are all development related.
+		// 如果窗口正在重新加载，并且我们处于扩展开发模式，
+		// 一些配置项会被继承。这些选项都与开发相关。
 		if (this.isExtensionDevelopmentHost && cli) {
 			configuration.verbose = cli.verbose;
 			configuration.debugId = cli.debugId;
@@ -1139,8 +1194,8 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		}
 
 		configuration.accessibilitySupport = electron.app.isAccessibilitySupportEnabled();
-		configuration.isInitialStartup = false; // since this is a reload
-		configuration.policiesData = this.policyService.serialize(); // set policies data again
+		configuration.isInitialStartup = false; // 因为这是重新加载
+		configuration.policiesData = this.policyService.serialize(); // 再次设置策略数据
 		configuration.continueOn = this.environmentMainService.continueOn;
 		configuration.profiles = {
 			all: this.userDataProfilesService.profiles,
@@ -1150,13 +1205,16 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		configuration.logLevel = this.loggerMainService.getLogLevel();
 		configuration.loggers = this.loggerMainService.getGlobalLoggers();
 
-		// Load config
+		// 加载配置
 		this.load(configuration, { isReload: true, disableExtensions: cli?.['disable-extensions'] });
 	}
 
+	/**
+	 * 在重新加载前验证工作区
+	 */
 	private async validateWorkspaceBeforeReload(configuration: INativeWindowConfiguration): Promise<IWorkspaceIdentifier | ISingleFolderWorkspaceIdentifier | undefined> {
 
-		// Multi folder
+		// 多文件夹工作区
 		if (isWorkspaceIdentifier(configuration.workspace)) {
 			const configPath = configuration.workspace.configPath;
 			if (configPath.scheme === Schemas.file) {
@@ -1167,7 +1225,7 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			}
 		}
 
-		// Single folder
+		// 单文件夹工作区
 		else if (isSingleFolderWorkspaceIdentifier(configuration.workspace)) {
 			const uri = configuration.workspace.uri;
 			if (uri.scheme === Schemas.file) {
@@ -1178,7 +1236,7 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			}
 		}
 
-		// Workspace is valid
+		// 工作区有效
 		return configuration.workspace;
 	}
 
@@ -1476,11 +1534,14 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		return segments;
 	}
 
+	/**
+	 * 开始收集JS调用栈，用于诊断无响应情况
+	 */
 	private async startCollectingJScallStacks(): Promise<void> {
 		if (!this.jsCallStackCollector.isTriggered()) {
 			const stack = await this._win.webContents.mainFrame.collectJavaScriptCallStack();
 
-			// Increment the count for this stack trace
+			// 增加此堆栈跟踪的计数
 			if (stack) {
 				const count = this.jsCallStackMap.get(stack) || 0;
 				this.jsCallStackMap.set(stack, count + 1);
@@ -1490,12 +1551,15 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		}
 	}
 
+	/**
+	 * 停止收集JS调用栈，并分析收集的数据
+	 */
 	private stopCollectingJScallStacks(): void {
 		this.jsCallStackCollectorStopScheduler.cancel();
 		this.jsCallStackCollector.cancel();
 
 		if (this.jsCallStackMap.size) {
-			let logMessage = `CodeWindow unresponsive samples:\n`;
+			let logMessage = `CodeWindow无响应采样:\n`;
 			let samples = 0;
 
 			const sortedEntries = Array.from(this.jsCallStackMap.entries())
@@ -1503,8 +1567,8 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 
 			for (const [stack, count] of sortedEntries) {
 				samples += count;
-				// If the stack appears more than 20 percent of the time, log it
-				// to the error telemetry as UnresponsiveSampleError.
+				// 如果堆栈出现超过样本总数的20%，则将其记录到
+				// 错误遥测中，作为UnresponsiveSampleError
 				if (Math.round((count * 100) / this.jsCallStackEffectiveSampleCount) > 20) {
 					const fakeError = new UnresponsiveError(stack, this.id, this.win?.webContents.getOSProcessId());
 					errorHandler.onUnexpectedError(fakeError);
@@ -1512,8 +1576,8 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 				logMessage += `<${count}> ${stack}\n`;
 			}
 
-			logMessage += `Total Samples: ${samples}\n`;
-			logMessage += 'For full overview of the unresponsive period, capture cpu profile via https://aka.ms/vscode-tracing-cpu-profile';
+			logMessage += `总样本: ${samples}\n`;
+			logMessage += '要获取无响应期间的完整概览，请通过 https://aka.ms/vscode-tracing-cpu-profile 捕获CPU配置文件';
 			this.logService.error(logMessage);
 		}
 
@@ -1532,14 +1596,17 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 	}
 }
 
+/**
+ * 无响应错误类，用于报告窗口无响应的情况
+ */
 class UnresponsiveError extends Error {
 
 	constructor(sample: string, windowId: number, pid: number = 0) {
-		// Since the stacks are available via the sample
-		// we can avoid collecting them when constructing the error.
+		// 由于样本中已经包含堆栈，
+		// 我们可以避免在构造错误时收集它们。
 		const stackTraceLimit = Error.stackTraceLimit;
 		Error.stackTraceLimit = 0;
-		super(`UnresponsiveSampleError: from window with ID ${windowId} belonging to process with pid ${pid}`);
+		super(`UnresponsiveSampleError: 来自ID为${windowId}的窗口，归属于进程ID ${pid}`);
 		Error.stackTraceLimit = stackTraceLimit;
 		this.name = 'UnresponsiveSampleError';
 		this.stack = sample;

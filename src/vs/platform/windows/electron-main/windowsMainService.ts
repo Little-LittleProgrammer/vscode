@@ -1694,11 +1694,11 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			cssModules: this.cssDevelopmentService.isEnabled ? await this.cssDevelopmentService.getCssModules() : undefined
 		};
 
-		// New window
+		// 新窗口
 		if (!window) {
 			const state = this.windowsStateHandler.getNewWindowState(configuration);
 
-			// Create the window
+			// 创建窗口
 			mark('code/willCreateCodeWindow');
 			const createdWindow = window = this.instantiationService.createInstance(CodeWindow, {
 				state,
@@ -1707,22 +1707,22 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			});
 			mark('code/didCreateCodeWindow');
 
-			// Add as window tab if configured (macOS only)
+			// 如果配置了，则将窗口添加为标签页（仅限 macOS）
 			if (options.forceNewTabbedWindow) {
 				const activeWindow = this.getLastActiveWindow();
 				activeWindow?.addTabbedWindow(createdWindow);
 			}
 
-			// Add to our list of windows
+			// 将窗口添加到我们的窗口列表中
 			this.windows.set(createdWindow.id, createdWindow);
 
-			// Indicate new window via event
+			// 通过事件指示新窗口
 			this._onDidOpenWindow.fire(createdWindow);
 
-			// Indicate number change via event
+			// 通过事件指示窗口数量变化
 			this._onDidChangeWindowsCount.fire({ oldCount: this.getWindowCount() - 1, newCount: this.getWindowCount() });
 
-			// Window Events
+			// 窗口事件
 			const disposables = new DisposableStore();
 			disposables.add(createdWindow.onDidSignalReady(() => this._onDidSignalReadyWindow.fire(createdWindow)));
 			disposables.add(Event.once(createdWindow.onDidClose)(() => this.onWindowClosed(createdWindow, disposables)));
@@ -1741,7 +1741,7 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			this.lifecycleMainService.registerWindow(createdWindow);
 		}
 
-		// Existing window
+		// 现有窗口
 		else {
 
 			// 如果窗口正在被重用，并且我们处于
@@ -1764,13 +1764,13 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			configuration.loggers = configuration.loggers;
 		}
 
-		// Update window identifier and session now
-		// that we have the window object in hand.
+		// 更新窗口标识符和会话
+		// 现在我们有了窗口对象。
 		configuration.windowId = window.id;
 
-		// If the window was already loaded, make sure to unload it
-		// first and only load the new configuration if that was
-		// not vetoed
+		// 如果窗口已经加载，确保先卸载它
+		// 只有在未被否决的情况下才加载新的配置
+		// 未被否决
 		if (window.isReady) {
 			this.lifecycleMainService.unload(window, UnloadReason.LOAD).then(async veto => {
 				if (!veto) {
