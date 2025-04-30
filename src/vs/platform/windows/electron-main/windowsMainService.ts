@@ -1722,7 +1722,7 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			// 通过事件指示窗口数量变化
 			this._onDidChangeWindowsCount.fire({ oldCount: this.getWindowCount() - 1, newCount: this.getWindowCount() });
 
-			// 窗口事件
+			// 窗口事件窗口监听器
 			const disposables = new DisposableStore();
 			disposables.add(createdWindow.onDidSignalReady(() => this._onDidSignalReadyWindow.fire(createdWindow)));
 			disposables.add(Event.once(createdWindow.onDidClose)(() => this.onWindowClosed(createdWindow, disposables)));
@@ -1737,7 +1737,7 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			webContents.removeAllListeners('devtools-reload-page'); // 移除内置侦听器，以便我们可以自己处理
 			disposables.add(Event.fromNodeEventEmitter(webContents, 'devtools-reload-page')(() => this.lifecycleMainService.reload(createdWindow)));
 
-			// Lifecycle
+			// 5.注册窗口生命周期
 			this.lifecycleMainService.registerWindow(createdWindow);
 		}
 

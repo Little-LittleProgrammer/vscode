@@ -146,6 +146,7 @@ if (process.platform === 'win32' || process.platform === 'linux') {
 app.once('ready', function () {
 	// 如果指定了 trace 参数，则开始跟踪， 性能分析
 	if (args['trace']) {
+		console.log('【trace】开始跟踪， 性能分析');
 		let traceOptions: Electron.TraceConfig | Electron.TraceCategoriesAndOptions;
 		if (args['trace-memory-infra']) {
 			const customCategories = args['trace-category-filter']?.split(',') || [];

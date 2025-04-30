@@ -134,13 +134,13 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 		this._register(Event.fromNodeEventEmitter(this._win, 'enter-full-screen')(() => this._onDidEnterFullScreen.fire()));
 		this._register(Event.fromNodeEventEmitter(this._win, 'leave-full-screen')(() => this._onDidLeaveFullScreen.fire()));
 
-		// Sheet Offsets
+		// Sheet 偏移量
 		const useCustomTitleStyle = !hasNativeTitlebar(this.configurationService, options?.titleBarStyle === 'hidden' ? TitlebarStyle.CUSTOM : undefined /* unknown */);
 		if (isMacintosh && useCustomTitleStyle) {
-			win.setSheetOffset(isBigSurOrNewer(release()) ? 28 : 22); // offset dialogs by the height of the custom title bar if we have any
+			win.setSheetOffset(isBigSurOrNewer(release()) ? 28 : 22); // 如果有自定义标题栏，则根据自定义标题栏的高度偏移对话框
 		}
 
-		// Update the window controls immediately based on cached or default values
+		// 根据缓存或默认值立即更新窗口控件
 		if (useCustomTitleStyle && useWindowControlsOverlay(this.configurationService)) {
 			const cachedWindowControlHeight = this.stateService.getItem<number>((BaseWindow.windowControlHeightStateStorageKey));
 			if (cachedWindowControlHeight) {
@@ -150,7 +150,7 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 			}
 		}
 
-		// Setup windows system context menu so it only is allowed in certain cases
+		// 设置Windows系统上下文菜单，使其仅在特定情况下允许使用
 		if (isWindows && useCustomTitleStyle) {
 			this._register(Event.fromNodeEventEmitter(win, 'system-context-menu', (event: Electron.Event, point: Electron.Point) => ({ event, point }))((e) => {
 				const [x, y] = win.getPosition();
@@ -158,14 +158,14 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 				const cx = Math.floor(cursorPos.x) - x;
 				const cy = Math.floor(cursorPos.y) - y;
 
-				// In some cases, show the default system context menu
-				// 1) The mouse position is not within the title bar
-				// 2) The mouse position is within the title bar, but over the app icon
-				// We do not know the exact title bar height but we make an estimate based on window height
+				// 在某些情况下，显示默认系统上下文菜单
+				// 1) 鼠标位置不在标题栏内
+				// 2) 鼠标位置在标题栏内，但在应用图标上
+				// 我们无法确切知道标题栏的高度，但我们根据窗口高度进行估计
 				const shouldTriggerDefaultSystemContextMenu = () => {
-					// Use the custom context menu when over the title bar, but not over the app icon
-					// The app icon is estimated to be 30px wide
-					// The title bar is estimated to be the max of 35px and 15% of the window height
+					// 当鼠标在标题栏上但不在应用图标上时使用自定义上下文菜单
+					// 应用图标估计宽度为30px
+					// 标题栏高度估计为窗口高度的15%，至少35px
 					if (cx > 30 && cy >= 0 && cy <= Math.max(win.getBounds().height * 0.15, 35)) {
 						return false;
 					}
@@ -181,12 +181,12 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 			}));
 		}
 
-		// Open devtools if instructed from command line args
+		// 如果命令行参数指示，则打开开发者工具
 		if (this.environmentMainService.args['open-devtools'] === true) {
 			win.webContents.openDevTools();
 		}
 
-		// macOS: Window Fullscreen Transitions
+		// macOS: 窗口全屏过渡
 		if (isMacintosh) {
 			this._register(this.onDidEnterFullScreen(() => {
 				this.joinNativeFullScreenTransition?.complete(true);
@@ -286,6 +286,10 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 		return !!this.documentEdited;
 	}
 
+	/**
+	 * 使窗口获取焦点
+	 * @param options 焦点选项
+	 */
 	focus(options?: { force: boolean }): void {
 		if (isMacintosh && options?.force) {
 			electron.app.focus({ steal: true });
@@ -307,33 +311,35 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 
 	private static readonly windowControlHeightStateStorageKey = 'windowControlHeight';
 
+	/**
+	 * 更新窗口控制按钮
+	 */
 	updateWindowControls(options: { height?: number; backgroundColor?: string; foregroundColor?: string }): void {
 		const win = this.win;
 		if (!win) {
 			return;
 		}
 
-		// Cache the height for speeds lookups on startup
+		// 缓存高度以便在启动时快速查找
 		if (options.height) {
 			this.stateService.setItem((CodeWindow.windowControlHeightStateStorageKey), options.height);
 		}
 
-		// Windows/Linux: update window controls via setTitleBarOverlay()
+		// Windows/Linux: 通过setTitleBarOverlay()更新窗口控件
 		if (!isMacintosh && useWindowControlsOverlay(this.configurationService)) {
 			win.setTitleBarOverlay({
 				color: options.backgroundColor?.trim() === '' ? undefined : options.backgroundColor,
 				symbolColor: options.foregroundColor?.trim() === '' ? undefined : options.foregroundColor,
-				height: options.height ? options.height - 1 : undefined // account for window border
+				height: options.height ? options.height - 1 : undefined // 考虑窗口边框
 			});
 		}
 
-		// macOS: update window controls via setWindowButtonPosition()
+		// macOS: 通过setWindowButtonPosition()更新窗口控件
 		else if (isMacintosh && options.height !== undefined) {
-			// The traffic lights have a height of 12px. There's an invisible margin
-			// of 2px at the top and bottom, and 1px on the left and right. Therefore,
-			// the height for centering is 12px + 2 * 2px = 16px. When the position
-			// is set, the horizontal margin is offset to ensure the distance between
-			// the traffic lights and the window frame is equal in both directions.
+			// 交通灯按钮高度为12px。顶部和底部有2px的不可见边距，
+			// 左右各有1px的边距。因此，居中的高度为12px + 2 * 2px = 16px。
+			// 当设置位置时，水平边距被偏移以确保交通灯按钮与窗口框架
+			// 的距离在两个方向上相等。
 			const offset = Math.floor((options.height - 16) / 2);
 			if (!offset) {
 				win.setWindowButtonPosition(null);
@@ -516,7 +522,7 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			return undefined;
 		}
 
-		const profile = this.userDataProfilesService.profiles.find(profile => profile.id === this.config?.profiles.profile.id);
+		const profile = this.userDataProfilesService.profiles.find(profile => profile.id === this._config?.profiles.profile.id);
 		if (this.isExtensionDevelopmentHost && profile) {
 			return profile;
 		}
@@ -700,25 +706,26 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		});
 	}
 
+	/**
+	 * 注册事件监听器
+	 */
 	private registerListeners(): void {
 
-		// Window error conditions to handle
+		// 需要处理的窗口错误条件
 		this._register(Event.fromNodeEventEmitter(this._win, 'unresponsive')(() => this.onWindowError(WindowError.UNRESPONSIVE)));
 		this._register(Event.fromNodeEventEmitter(this._win, 'responsive')(() => this.onWindowError(WindowError.RESPONSIVE)));
 		this._register(Event.fromNodeEventEmitter(this._win.webContents, 'render-process-gone', (event, details) => details)(details => this.onWindowError(WindowError.PROCESS_GONE, { ...details })));
 		this._register(Event.fromNodeEventEmitter(this._win.webContents, 'did-fail-load', (event, exitCode, reason) => ({ exitCode, reason }))(({ exitCode, reason }) => this.onWindowError(WindowError.LOAD, { reason, exitCode })));
 
-		// Prevent windows/iframes from blocking the unload
-		// through DOM events. We have our own logic for
-		// unloading a window that should not be confused
-		// with the DOM way.
+		// 通过DOM事件防止窗口/iframe阻止卸载。
+		// 我们有自己的窗口卸载逻辑，不应该与DOM方式混淆。
 		// (https://github.com/microsoft/vscode/issues/122736)
 		this._register(Event.fromNodeEventEmitter<electron.Event>(this._win.webContents, 'will-prevent-unload')(event => event.preventDefault()));
 
-		// Remember that we loaded
+		// 记住我们已经加载
 		this._register(Event.fromNodeEventEmitter(this._win.webContents, 'did-finish-load')(() => {
 
-			// Associate properties from the load request if provided
+			// 如果提供，关联加载请求中的属性
 			if (this.pendingLoadConfig) {
 				this._config = this.pendingLoadConfig;
 
@@ -726,7 +733,7 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			}
 		}));
 
-		// Window (Un)Maximize
+		// 窗口(取消)最大化
 		this._register(this.onDidMaximize(() => {
 			if (this._config) {
 				this._config.maximized = true;
@@ -739,7 +746,7 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			}
 		}));
 
-		// Window Fullscreen
+		// 窗口全屏
 		this._register(this.onDidEnterFullScreen(() => {
 			this.sendWhenReady('vscode:enterFullScreen', CancellationToken.None);
 		}));
@@ -748,13 +755,13 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			this.sendWhenReady('vscode:leaveFullScreen', CancellationToken.None);
 		}));
 
-		// Handle configuration changes
+		// 处理配置变更
 		this._register(this.configurationService.onDidChangeConfiguration(e => this.onConfigurationUpdated(e)));
 
-		// Handle Workspace events
+		// 处理工作区事件
 		this._register(this.workspacesManagementMainService.onDidDeleteUntitledWorkspace(e => this.onDidDeleteUntitledWorkspace(e)));
 
-		// Inject headers when requests are incoming
+		// 当请求进入时注入头信息
 		const urls = ['https://marketplace.visualstudio.com/*', 'https://*.vsassets.io/*'];
 		this._win.webContents.session.webRequest.onBeforeSendHeaders({ urls }, async (details, cb) => {
 			const headers = await this.getMarketplaceHeaders();
@@ -764,6 +771,9 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 	}
 
 	private marketplaceHeadersPromise: Promise<object> | undefined;
+	/**
+	 * 获取应用商店请求所需的HTTP头
+	 */
 	private getMarketplaceHeaders(): Promise<object> {
 		if (!this.marketplaceHeadersPromise) {
 			this.marketplaceHeadersPromise = resolveMarketplaceHeaders(
@@ -988,9 +998,12 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		}
 	}
 
+	/**
+	 * 处理配置更新
+	 */
 	private onConfigurationUpdated(e?: IConfigurationChangeEvent): void {
 
-		// Menubar
+		// 菜单栏
 		if (!e || e.affectsConfiguration('window.menuBarVisibility')) {
 			const newMenuBarVisibility = this.getMenuBarVisibility();
 			if (newMenuBarVisibility !== this.currentMenuBarVisibility) {
@@ -999,11 +1012,11 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			}
 		}
 
-		// Proxy
+		// 代理
 		if (!e || e.affectsConfiguration('http.proxy') || e.affectsConfiguration('http.noProxy')) {
 			const inspect = this.configurationService.inspect<string>('http.proxy');
 			let newHttpProxy = (inspect.userLocalValue || '').trim()
-				|| (process.env['https_proxy'] || process.env['HTTPS_PROXY'] || process.env['http_proxy'] || process.env['HTTP_PROXY'] || '').trim() // Not standardized.
+				|| (process.env['https_proxy'] || process.env['HTTPS_PROXY'] || process.env['http_proxy'] || process.env['HTTP_PROXY'] || '').trim() // 非标准化
 				|| undefined;
 
 			if (newHttpProxy?.indexOf('@') !== -1) {
@@ -1019,17 +1032,88 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 			}
 
 			const newNoProxy = (this.configurationService.getValue<string[]>('http.noProxy') || []).map((item) => item.trim()).join(',')
-				|| (process.env['no_proxy'] || process.env['NO_PROXY'] || '').trim() || undefined; // Not standardized.
+				|| (process.env['no_proxy'] || process.env['NO_PROXY'] || '').trim() || undefined; // 非标准化
 			if ((newHttpProxy || '').indexOf('@') === -1 && (newHttpProxy !== this.currentHttpProxy || newNoProxy !== this.currentNoProxy)) {
 				this.currentHttpProxy = newHttpProxy;
 				this.currentNoProxy = newNoProxy;
 
 				const proxyRules = newHttpProxy || '';
 				const proxyBypassRules = newNoProxy ? `${newNoProxy},<local>` : '<local>';
-				this.logService.trace(`Setting proxy to '${proxyRules}', bypassing '${proxyBypassRules}'`);
+				this.logService.trace(`设置代理为 '${proxyRules}'，绕过 '${proxyBypassRules}'`);
 				this._win.webContents.session.setProxy({ proxyRules, proxyBypassRules, pacScript: '' });
 				electron.app.setProxy({ proxyRules, proxyBypassRules, pacScript: '' });
 			}
+		}
+	}
+
+	/**
+	 * 获取菜单栏可见性设置
+	 */
+	private getMenuBarVisibility(): MenuBarVisibility {
+		let menuBarVisibility = getMenuBarVisibility(this.configurationService);
+		if (['visible', 'toggle', 'hidden'].indexOf(menuBarVisibility) < 0) {
+			menuBarVisibility = 'classic';
+		}
+
+		return menuBarVisibility;
+	}
+
+	/**
+	 * 设置菜单栏可见性
+	 * @param visibility 可见性设置
+	 * @param notify 是否通知用户
+	 */
+	private setMenuBarVisibility(visibility: MenuBarVisibility, notify: boolean = true): void {
+		if (isMacintosh) {
+			return; // 忽略macOS平台
+		}
+
+		if (visibility === 'toggle') {
+			if (notify) {
+				this.send('vscode:showInfoMessage', localize('hiddenMenuBar', "您仍然可以通过按Alt键访问菜单栏。"));
+			}
+		}
+
+		if (visibility === 'hidden') {
+			// 由于某些我无法解释的奇怪原因，直接调用
+			// 这个方法而不使用超时不会隐藏菜单栏（参见 https://github.com/microsoft/vscode/issues/19777）。
+			// 似乎我们首次打开窗口和创建菜单栏之间存在时序问题。
+			// 不知何故，我们想通过Alt键隐藏菜单而不能恢复它的事实使Electron
+			// 仍然显示了菜单。无法从简单的Hello World应用程序中复现这个问题...
+			setTimeout(() => {
+				this.doSetMenuBarVisibility(visibility);
+			});
+		} else {
+			this.doSetMenuBarVisibility(visibility);
+		}
+	}
+
+	/**
+	 * 实际执行菜单栏可见性设置
+	 */
+	private doSetMenuBarVisibility(visibility: MenuBarVisibility): void {
+		const isFullscreen = this.isFullScreen;
+
+		switch (visibility) {
+			case ('classic'):
+				this._win.setMenuBarVisibility(!isFullscreen);
+				this._win.autoHideMenuBar = isFullscreen;
+				break;
+
+			case ('visible'):
+				this._win.setMenuBarVisibility(true);
+				this._win.autoHideMenuBar = false;
+				break;
+
+			case ('toggle'):
+				this._win.setMenuBarVisibility(false);
+				this._win.autoHideMenuBar = true;
+				break;
+
+			case ('hidden'):
+				this._win.setMenuBarVisibility(false);
+				this._win.autoHideMenuBar = false;
+				break;
 		}
 	}
 
@@ -1082,7 +1166,14 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		// 指示我们现在正在导航
 		this.readyState = ReadyState.NAVIGATING;
 
-		// 加载URL
+		/**
+		 * 加载URL, 是整个 VSCode 编辑器的基础框架页面，它包含了：
+		 * 	编辑器布局
+		 * 	菜单
+		 * 	侧边栏
+		 * 	面板
+		 * 	状态栏
+		 */
 		this._win.loadURL(FileAccess.asBrowserUri(`vs/code/electron-sandbox/workbench/workbench${this.environmentMainService.isBuilt ? '' : '-dev'}.html`).toString(true));
 
 		// 记住我们已经加载
@@ -1240,20 +1331,23 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		return configuration.workspace;
 	}
 
+	/**
+	 * 序列化窗口状态，将当前窗口的位置、大小和模式保存为可恢复的状态对象
+	 */
 	serializeWindowState(): IWindowState {
 		if (!this._win) {
 			return defaultWindowState();
 		}
 
-		// fullscreen gets special treatment
+		// 全屏状态需要特殊处理
 		if (this.isFullScreen) {
 			let display: electron.Display | undefined;
 			try {
 				display = electron.screen.getDisplayMatching(this.getBounds());
 			} catch (error) {
-				// Electron has weird conditions under which it throws errors
-				// e.g. https://github.com/microsoft/vscode/issues/100334 when
-				// large numbers are passed in
+				// Electron在某些条件下会抛出错误
+				// 例如 https://github.com/microsoft/vscode/issues/100334
+				// 当传入大数值时
 			}
 
 			const defaultState = defaultWindowState();
@@ -1262,11 +1356,11 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 				mode: WindowMode.Fullscreen,
 				display: display ? display.id : undefined,
 
-				// Still carry over window dimensions from previous sessions
-				// if we can compute it in fullscreen state.
-				// does not seem possible in all cases on Linux for example
-				// (https://github.com/microsoft/vscode/issues/58218) so we
-				// fallback to the defaults in that case.
+				// 即使在全屏状态下，仍然保留之前会话的窗口尺寸
+				// 如果我们能在全屏状态下计算它。
+				// 在某些情况下似乎不可能，例如在Linux上
+				// (https://github.com/microsoft/vscode/issues/58218)
+				// 所以在这种情况下我们退回到默认值。
 				width: this.windowState.width || defaultState.width,
 				height: this.windowState.height || defaultState.height,
 				x: this.windowState.x || 0,
@@ -1278,27 +1372,27 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		const state: IWindowState = Object.create(null);
 		let mode: WindowMode;
 
-		// get window mode
+		// 获取窗口模式
 		if (!isMacintosh && this._win.isMaximized()) {
 			mode = WindowMode.Maximized;
 		} else {
 			mode = WindowMode.Normal;
 		}
 
-		// we don't want to save minimized state, only maximized or normal
+		// 我们不想保存最小化状态，只保存最大化或正常状态
 		if (mode === WindowMode.Maximized) {
 			state.mode = WindowMode.Maximized;
 		} else {
 			state.mode = WindowMode.Normal;
 		}
 
-		// only consider non-minimized window states
+		// 只考虑非最小化的窗口状态
 		if (mode === WindowMode.Normal || mode === WindowMode.Maximized) {
 			let bounds: electron.Rectangle;
 			if (mode === WindowMode.Normal) {
 				bounds = this.getBounds();
 			} else {
-				bounds = this._win.getNormalBounds(); // make sure to persist the normal bounds when maximized to be able to restore them
+				bounds = this._win.getNormalBounds(); // 确保在最大化时保存正常边界，以便能够恢复它们
 			}
 
 			state.x = bounds.x;
@@ -1312,23 +1406,26 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		return state;
 	}
 
-	private restoreWindowState(state?: IWindowState): [IWindowState, boolean? /* has multiple displays */] {
+	/**
+	 * 恢复窗口状态，根据保存的状态对象设置窗口位置、大小和模式
+	 */
+	private restoreWindowState(state?: IWindowState): [IWindowState, boolean? /* 是否有多个显示器 */] {
 		mark('code/willRestoreCodeWindowState');
 
 		let hasMultipleDisplays = false;
 		if (state) {
 
-			// Window zoom
+			// 窗口缩放
 			this.customZoomLevel = state.zoomLevel;
 
-			// Window dimensions
+			// 窗口尺寸
 			try {
 				const displays = electron.screen.getAllDisplays();
 				hasMultipleDisplays = displays.length > 1;
 
 				state = WindowStateValidator.validateWindowState(this.logService, state, displays);
 			} catch (err) {
-				this.logService.warn(`Unexpected error validating window state: ${err}\n${err.stack}`); // somehow display API can be picky about the state to validate
+				this.logService.warn(`验证窗口状态时发生意外错误: ${err}\n${err.stack}`); // 由于某些原因显示API对要验证的状态可能很挑剔
 			}
 		}
 
@@ -1353,66 +1450,6 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		// Respect configured menu bar visibility or default to toggle if not set
 		if (this.currentMenuBarVisibility) {
 			this.setMenuBarVisibility(this.currentMenuBarVisibility, false);
-		}
-	}
-
-	private getMenuBarVisibility(): MenuBarVisibility {
-		let menuBarVisibility = getMenuBarVisibility(this.configurationService);
-		if (['visible', 'toggle', 'hidden'].indexOf(menuBarVisibility) < 0) {
-			menuBarVisibility = 'classic';
-		}
-
-		return menuBarVisibility;
-	}
-
-	private setMenuBarVisibility(visibility: MenuBarVisibility, notify: boolean = true): void {
-		if (isMacintosh) {
-			return; // ignore for macOS platform
-		}
-
-		if (visibility === 'toggle') {
-			if (notify) {
-				this.send('vscode:showInfoMessage', localize('hiddenMenuBar', "You can still access the menu bar by pressing the Alt-key."));
-			}
-		}
-
-		if (visibility === 'hidden') {
-			// for some weird reason that I have no explanation for, the menu bar is not hiding when calling
-			// this without timeout (see https://github.com/microsoft/vscode/issues/19777). there seems to be
-			// a timing issue with us opening the first window and the menu bar getting created. somehow the
-			// fact that we want to hide the menu without being able to bring it back via Alt key makes Electron
-			// still show the menu. Unable to reproduce from a simple Hello World application though...
-			setTimeout(() => {
-				this.doSetMenuBarVisibility(visibility);
-			});
-		} else {
-			this.doSetMenuBarVisibility(visibility);
-		}
-	}
-
-	private doSetMenuBarVisibility(visibility: MenuBarVisibility): void {
-		const isFullscreen = this.isFullScreen;
-
-		switch (visibility) {
-			case ('classic'):
-				this._win.setMenuBarVisibility(!isFullscreen);
-				this._win.autoHideMenuBar = isFullscreen;
-				break;
-
-			case ('visible'):
-				this._win.setMenuBarVisibility(true);
-				this._win.autoHideMenuBar = false;
-				break;
-
-			case ('toggle'):
-				this._win.setMenuBarVisibility(false);
-				this._win.autoHideMenuBar = true;
-				break;
-
-			case ('hidden'):
-				this._win.setMenuBarVisibility(false);
-				this._win.autoHideMenuBar = false;
-				break;
 		}
 	}
 
@@ -1460,27 +1497,33 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		}
 	}
 
+	/**
+	 * 更新触控栏分组
+	 * @param groups 命令动作组
+	 */
 	updateTouchBar(groups: ISerializableCommandAction[][]): void {
 		if (!isMacintosh) {
-			return; // only supported on macOS
+			return; // 仅在macOS上支持
 		}
 
-		// Update segments for all groups. Setting the segments property
-		// of the group directly prevents ugly flickering from happening
+		// 更新所有组的分段。直接设置分段属性
+		// 可以防止难看的闪烁发生
 		this.touchBarGroups.forEach((touchBarGroup, index) => {
 			const commands = groups[index];
 			touchBarGroup.segments = this.createTouchBarGroupSegments(commands);
 		});
 	}
 
+	/**
+	 * 创建触控栏
+	 */
 	private createTouchBar(): void {
 		if (!isMacintosh) {
-			return; // only supported on macOS
+			return; // 仅在macOS上支持
 		}
 
-		// To avoid flickering, we try to reuse the touch bar group
-		// as much as possible by creating a large number of groups
-		// for reusing later.
+		// 为了避免闪烁，我们尝试尽可能多地重用触控栏组
+		// 方法是创建大量组以供后续重用。
 		for (let i = 0; i < 10; i++) {
 			const groupTouchBar = this.createTouchBarGroup();
 			this.touchBarGroups.push(groupTouchBar);
@@ -1489,12 +1532,16 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		this._win.setTouchBar(new electron.TouchBar({ items: this.touchBarGroups }));
 	}
 
+	/**
+	 * 创建触控栏组
+	 * @param items 命令动作项
+	 */
 	private createTouchBarGroup(items: ISerializableCommandAction[] = []): electron.TouchBarSegmentedControl {
 
-		// Group Segments
+		// 组段
 		const segments = this.createTouchBarGroupSegments(items);
 
-		// Group Control
+		// 组控件
 		const control = new electron.TouchBar.TouchBarSegmentedControl({
 			segments,
 			mode: 'buttons',
@@ -1507,6 +1554,10 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
 		return control;
 	}
 
+	/**
+	 * 创建触控栏组段
+	 * @param items 命令动作项
+	 */
 	private createTouchBarGroupSegments(items: ISerializableCommandAction[] = []): ITouchBarSegment[] {
 		const segments: ITouchBarSegment[] = items.map(item => {
 			let icon: electron.NativeImage | undefined;

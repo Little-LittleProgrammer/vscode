@@ -15,28 +15,60 @@ import { MicrotaskDelay } from './symbols.js';
 
 
 // -----------------------------------------------------------------------------------------------------------------------
-// Uncomment the next line to print warnings whenever an emitter with listeners is disposed. That is a sign of code smell.
+// 取消下一行的注释以在具有监听器的发射器被释放时打印警告。这是代码异味的标志。
 // -----------------------------------------------------------------------------------------------------------------------
 const _enableDisposeWithListenerWarning = false
-	// || Boolean("TRUE") // causes a linter warning so that it cannot be pushed
+	// || Boolean("TRUE") // 引起一个linter警告，以便它不能被推送
 	;
 
 
 // -----------------------------------------------------------------------------------------------------------------------
-// Uncomment the next line to print warnings whenever a snapshotted event is used repeatedly without cleanup.
-// See https://github.com/microsoft/vscode/issues/142851
+// 取消下一行的注释以在快照事件被重复使用而没有清理时打印警告。
+// 参见 https://github.com/microsoft/vscode/issues/142851
 // -----------------------------------------------------------------------------------------------------------------------
 const _enableSnapshotPotentialLeakWarning = false
-	// || Boolean("TRUE") // causes a linter warning so that it cannot be pushed
+	// || Boolean("TRUE") // 引起一个linter警告，以便它不能被推送
 	;
 
 /**
- * An event with zero or one parameters that can be subscribed to. The event is a function itself.
+ * 一个可以被订阅的具有零个或一个参数的事件。事件本身是一个函数。
  */
 export interface Event<T> {
 	(listener: (e: T) => unknown, thisArgs?: any, disposables?: IDisposable[] | DisposableStore): IDisposable;
 }
 
+/**
+ * 事件系统的核心实现：
+ * 	- 定义了Event接口和Emitter类，是VSCode发布-订阅模式的基础设施
+ * 	- 允许代码在不同模块间进行松耦合的通信
+ * 丰富的事件操作符：
+* 	- map: 将一种类型的事件映射为另一种类型
+* 	- filter: 根据条件过滤事件
+* 	- debounce: 对事件进行去抖动处理
+* 	- latch: 防止连续重复触发相同事件
+* 	- once: 创建只触发一次的事件
+* 	- buffer: 缓存事件直到有监听器
+* 	- chain: 支持链式函数式编程风格
+* 特殊事件发射器：
+* 	- AsyncEmitter: 支持异步事件处理
+* 	- PauseableEmitter: 可暂停的事件发射器
+* 	- DebounceEmitter: 自带去抖动功能的发射器
+* 	- MicrotaskEmitter: 将事件延迟到微任务队列
+* 	- EventMultiplexer: 多个事件源的聚合器
+* 	- Relay: 可动态切换事件源的转发器
+* 内存泄漏防护：
+* 	- 提供监听器泄漏检测和警告机制
+* 	- 通过阈值控制允许的监听器数量
+* 	- 当超过阈值时提供详细的堆栈追踪
+* 性能监控：
+* 	- 通过EventProfiling实现事件性能分析
+* 	- 记录事件触发次数、耗时等指标
+* 适配器模式：
+* 	- fromNodeEventEmitter: 将Node.js事件转为VSCode事件
+* 	- fromDOMEventEmitter: 将DOM事件转为VSCode事件
+* 	- fromPromise: 将Promise转为事件
+* 	- fromObservable: 将Observable模式转为事件
+ */
 export namespace Event {
 	export const None: Event<any> = () => Disposable.None;
 
@@ -47,7 +79,7 @@ export namespace Event {
 			let count = 0;
 			options.onDidAddListener = () => {
 				if (++count === 2) {
-					console.warn('snapshotted emitter LIKELY used public and SHOULD HAVE BEEN created with DisposableStore. snapshotted here');
+					console.warn('快照发射器可能被公开使用，应该使用DisposableStore创建。在此处进行快照');
 					stack.print();
 				}
 				origListenerDidAdd?.();
@@ -56,33 +88,32 @@ export namespace Event {
 	}
 
 	/**
-	 * Given an event, returns another event which debounces calls and defers the listeners to a later task via a shared
-	 * `setTimeout`. The event is converted into a signal (`Event<void>`) to avoid additional object creation as a
-	 * result of merging events and to try prevent race conditions that could arise when using related deferred and
-	 * non-deferred events.
+	 * 给定一个事件，返回另一个事件，该事件通过共享的`setTimeout`对调用进行去抖动并将监听器延迟到后续任务。
+	 * 事件被转换为信号(`Event<void>`)以避免由于合并事件而产生额外的对象创建，并尝试防止使用相关的延迟和
+	 * 非延迟事件时可能出现的竞态条件。
 	 *
-	 * This is useful for deferring non-critical work (eg. general UI updates) to ensure it does not block critical work
-	 * (eg. latency of keypress to text rendered).
+	 * 这对于延迟非关键工作（例如，一般UI更新）非常有用，以确保它不会阻塞关键工作
+	 * （例如，按键到渲染文本的延迟）。
 	 *
-	 * *NOTE* that this function returns an `Event` and it MUST be called with a `DisposableStore` whenever the returned
-	 * event is accessible to "third parties", e.g the event is a public property. Otherwise a leaked listener on the
-	 * returned event causes this utility to leak a listener on the original event.
+	 * *注意*，此函数返回一个`Event`，当返回的事件对"第三方"可访问时（例如，事件是公共属性），
+	 * 必须使用`DisposableStore`调用它。否则，返回事件上的泄漏监听器会导致此工具在原始事件上
+	 * 泄漏一个监听器。
 	 *
-	 * @param event The event source for the new event.
-	 * @param disposable A disposable store to add the new EventEmitter to.
+	 * @param event 新事件的事件源。
+	 * @param disposable 要将新EventEmitter添加到的一个可释放存储。
 	 */
 	export function defer(event: Event<unknown>, disposable?: DisposableStore): Event<void> {
 		return debounce<unknown, void>(event, () => void 0, 0, undefined, true, undefined, disposable);
 	}
 
 	/**
-	 * Given an event, returns another event which only fires once.
+	 * 给定一个事件，返回另一个只触发一次的事件。
 	 *
-	 * @param event The event source for the new event.
+	 * @param event 新事件的事件源。
 	 */
 	export function once<T>(event: Event<T>): Event<T> {
 		return (listener, thisArgs = null, disposables?) => {
-			// we need this, in case the event fires during the listener call
+			// 我们需要这个，以防事件在监听器调用期间触发
 			let didFire = false;
 			let result: IDisposable | undefined = undefined;
 			result = event(e => {
@@ -106,56 +137,54 @@ export namespace Event {
 	}
 
 	/**
-	 * Given an event, returns another event which only fires once, and only when the condition is met.
+	 * 给定一个事件，返回另一个只触发一次，且仅当满足条件时触发的事件。
 	 *
-	 * @param event The event source for the new event.
+	 * @param event 新事件的事件源。
 	 */
 	export function onceIf<T>(event: Event<T>, condition: (e: T) => boolean): Event<T> {
 		return Event.once(Event.filter(event, condition));
 	}
 
 	/**
-	 * Maps an event of one type into an event of another type using a mapping function, similar to how
-	 * `Array.prototype.map` works.
+	 * 使用映射函数将一种类型的事件映射为另一种类型的事件，类似于`Array.prototype.map`的工作方式。
 	 *
-	 * *NOTE* that this function returns an `Event` and it MUST be called with a `DisposableStore` whenever the returned
-	 * event is accessible to "third parties", e.g the event is a public property. Otherwise a leaked listener on the
-	 * returned event causes this utility to leak a listener on the original event.
+	 * *注意*，此函数返回一个`Event`，当返回的事件对"第三方"可访问时（例如，事件是公共属性），
+	 * 必须使用`DisposableStore`调用它。否则，返回事件上的泄漏监听器会导致此工具在原始事件上
+	 * 泄漏一个监听器。
 	 *
-	 * @param event The event source for the new event.
-	 * @param map The mapping function.
-	 * @param disposable A disposable store to add the new EventEmitter to.
+	 * @param event 新事件的事件源。
+	 * @param map 映射函数。
+	 * @param disposable 要将新EventEmitter添加到的一个可释放存储。
 	 */
 	export function map<I, O>(event: Event<I>, map: (i: I) => O, disposable?: DisposableStore): Event<O> {
 		return snapshot((listener, thisArgs = null, disposables?) => event(i => listener.call(thisArgs, map(i)), null, disposables), disposable);
 	}
 
 	/**
-	 * Wraps an event in another event that performs some function on the event object before firing.
+	 * 将事件包装在另一个事件中，该事件在触发前对事件对象执行某些函数。
 	 *
-	 * *NOTE* that this function returns an `Event` and it MUST be called with a `DisposableStore` whenever the returned
-	 * event is accessible to "third parties", e.g the event is a public property. Otherwise a leaked listener on the
-	 * returned event causes this utility to leak a listener on the original event.
+	 * *注意*，此函数返回一个`Event`，当返回的事件对"第三方"可访问时（例如，事件是公共属性），
+	 * 必须使用`DisposableStore`调用它。否则，返回事件上的泄漏监听器会导致此工具在原始事件上
+	 * 泄漏一个监听器。
 	 *
-	 * @param event The event source for the new event.
-	 * @param each The function to perform on the event object.
-	 * @param disposable A disposable store to add the new EventEmitter to.
+	 * @param event 新事件的事件源。
+	 * @param each 在事件对象上执行的函数。
+	 * @param disposable 要将新EventEmitter添加到的一个可释放存储。
 	 */
 	export function forEach<I>(event: Event<I>, each: (i: I) => void, disposable?: DisposableStore): Event<I> {
 		return snapshot((listener, thisArgs = null, disposables?) => event(i => { each(i); listener.call(thisArgs, i); }, null, disposables), disposable);
 	}
 
 	/**
-	 * Wraps an event in another event that fires only when some condition is met.
+	 * 将事件包装在另一个仅在满足某些条件时触发的事件中。
 	 *
-	 * *NOTE* that this function returns an `Event` and it MUST be called with a `DisposableStore` whenever the returned
-	 * event is accessible to "third parties", e.g the event is a public property. Otherwise a leaked listener on the
-	 * returned event causes this utility to leak a listener on the original event.
+	 * *注意*，此函数返回一个`Event`，当返回的事件对"第三方"可访问时（例如，事件是公共属性），
+	 * 必须使用`DisposableStore`调用它。否则，返回事件上的泄漏监听器会导致此工具在原始事件上
+	 * 泄漏一个监听器。
 	 *
-	 * @param event The event source for the new event.
-	 * @param filter The filter function that defines the condition. The event will fire for the object if this function
-	 * returns true.
-	 * @param disposable A disposable store to add the new EventEmitter to.
+	 * @param event 新事件的事件源。
+	 * @param filter 定义条件的过滤函数。如果此函数返回true，则事件将为该对象触发。
+	 * @param disposable 要将新EventEmitter添加到的一个可释放存储。
 	 */
 	export function filter<T, U>(event: Event<T | U>, filter: (e: T | U) => e is T, disposable?: DisposableStore): Event<T>;
 	export function filter<T>(event: Event<T>, filter: (e: T) => boolean, disposable?: DisposableStore): Event<T>;
@@ -165,14 +194,14 @@ export namespace Event {
 	}
 
 	/**
-	 * Given an event, returns the same event but typed as `Event<void>`.
+	 * 给定一个事件，返回相同的事件但类型为`Event<void>`。
 	 */
 	export function signal<T>(event: Event<T>): Event<void> {
 		return event as Event<any> as Event<void>;
 	}
 
 	/**
-	 * Given a collection of events, returns a single event which emits whenever any of the provided events emit.
+	 * 给定一个事件集合，返回一个单一事件，该事件在任何提供的事件发出时发出。
 	 */
 	export function any<T>(...events: Event<T>[]): Event<T>;
 	export function any(...events: Event<any>[]): Event<void>;
@@ -184,9 +213,9 @@ export namespace Event {
 	}
 
 	/**
-	 * *NOTE* that this function returns an `Event` and it MUST be called with a `DisposableStore` whenever the returned
-	 * event is accessible to "third parties", e.g the event is a public property. Otherwise a leaked listener on the
-	 * returned event causes this utility to leak a listener on the original event.
+	 * *注意*，此函数返回一个`Event`，当返回的事件对"第三方"可访问时（例如，事件是公共属性），
+	 * 必须使用`DisposableStore`调用它。否则，返回事件上的泄漏监听器会导致此工具在原始事件上
+	 * 泄漏一个监听器。
 	 */
 	export function reduce<I, O>(event: Event<I>, merge: (last: O | undefined, event: I) => O, initial?: O, disposable?: DisposableStore): Event<O> {
 		let output: O | undefined = initial;
@@ -221,8 +250,8 @@ export namespace Event {
 	}
 
 	/**
-	 * Adds the IDisposable to the store if it's set, and returns it. Useful to
-	 * Event function implementation.
+	 * 如果设置了store，将IDisposable添加到store中，并返回它。
+	 * 对Event函数实现有用。
 	 */
 	function addAndReturnDisposable<T extends IDisposable>(d: T, store: DisposableStore | IDisposable[] | undefined): T {
 		if (store instanceof Array) {
@@ -234,22 +263,20 @@ export namespace Event {
 	}
 
 	/**
-	 * Given an event, creates a new emitter that event that will debounce events based on {@link delay} and give an
-	 * array event object of all events that fired.
+	 * 给定一个事件，创建一个新的发射器事件，它将基于{@link delay}延迟事件，并给出包含所有触发事件的数组事件对象。
 	 *
-	 * *NOTE* that this function returns an `Event` and it MUST be called with a `DisposableStore` whenever the returned
-	 * event is accessible to "third parties", e.g the event is a public property. Otherwise a leaked listener on the
-	 * returned event causes this utility to leak a listener on the original event.
+	 * *注意*，此函数返回一个`Event`，当返回的事件对"第三方"可访问时（例如，事件是公共属性），
+	 * 必须使用`DisposableStore`调用它。否则，返回事件上的泄漏监听器会导致此工具在原始事件上
+	 * 泄漏一个监听器。
 	 *
-	 * @param event The original event to debounce.
-	 * @param merge A function that reduces all events into a single event.
-	 * @param delay The number of milliseconds to debounce.
-	 * @param leading Whether to fire a leading event without debouncing.
-	 * @param flushOnListenerRemove Whether to fire all debounced events when a listener is removed. If this is not
-	 * specified, some events could go missing. Use this if it's important that all events are processed, even if the
-	 * listener gets disposed before the debounced event fires.
-	 * @param leakWarningThreshold See {@link EmitterOptions.leakWarningThreshold}.
-	 * @param disposable A disposable store to register the debounce emitter to.
+	 * @param event 要去抖的原始事件。
+	 * @param merge 将所有事件减少为单个事件的函数。
+	 * @param delay 去抖的毫秒数。
+	 * @param leading 是否在不去抖的情况下触发前导事件。
+	 * @param flushOnListenerRemove 移除监听器时是否触发所有去抖的事件。如果未指定，某些事件可能会丢失。
+	 * 如果重要的是处理所有事件，即使监听器在去抖事件触发前被释放，也可以使用此选项。
+	 * @param leakWarningThreshold 参见{@link EmitterOptions.leakWarningThreshold}。
+	 * @param disposable 注册去抖发射器的可释放存储。
 	 */
 	export function debounce<T>(event: Event<T>, merge: (last: T | undefined, event: T) => T, delay?: number | typeof MicrotaskDelay, leading?: boolean, flushOnListenerRemove?: boolean, leakWarningThreshold?: number, disposable?: DisposableStore): Event<T>;
 	export function debounce<I, O>(event: Event<I>, merge: (last: O | undefined, event: I) => O, delay?: number | typeof MicrotaskDelay, leading?: boolean, flushOnListenerRemove?: boolean, leakWarningThreshold?: number, disposable?: DisposableStore): Event<O>;
@@ -316,11 +343,11 @@ export namespace Event {
 	}
 
 	/**
-	 * Debounces an event, firing after some delay (default=0) with an array of all event original objects.
+	 * 去抖动一个事件，在一段延迟(默认=0)后触发，包含所有原始事件对象的数组。
 	 *
-	 * *NOTE* that this function returns an `Event` and it MUST be called with a `DisposableStore` whenever the returned
-	 * event is accessible to "third parties", e.g the event is a public property. Otherwise a leaked listener on the
-	 * returned event causes this utility to leak a listener on the original event.
+	 * *注意*，此函数返回一个`Event`，当返回的事件对"第三方"可访问时（例如，事件是公共属性），
+	 * 必须使用`DisposableStore`调用它。否则，返回事件上的泄漏监听器会导致此工具在原始事件上
+	 * 泄漏一个监听器。
 	 */
 	export function accumulate<T>(event: Event<T>, delay: number = 0, disposable?: DisposableStore): Event<T[]> {
 		return Event.debounce<T, T[]>(event, (last, e) => {
@@ -333,20 +360,19 @@ export namespace Event {
 	}
 
 	/**
-	 * Filters an event such that some condition is _not_ met more than once in a row, effectively ensuring duplicate
-	 * event objects from different sources do not fire the same event object.
+	 * 过滤一个事件，使某个条件在连续的情况下不会多次满足，有效确保来自不同源的重复事件对象不会触发相同的事件对象。
 	 *
-	 * *NOTE* that this function returns an `Event` and it MUST be called with a `DisposableStore` whenever the returned
-	 * event is accessible to "third parties", e.g the event is a public property. Otherwise a leaked listener on the
-	 * returned event causes this utility to leak a listener on the original event.
+	 * *注意*，此函数返回一个`Event`，当返回的事件对"第三方"可访问时（例如，事件是公共属性），
+	 * 必须使用`DisposableStore`调用它。否则，返回事件上的泄漏监听器会导致此工具在原始事件上
+	 * 泄漏一个监听器。
 	 *
-	 * @param event The event source for the new event.
-	 * @param equals The equality condition.
-	 * @param disposable A disposable store to add the new EventEmitter to.
+	 * @param event 新事件的事件源。
+	 * @param equals 相等条件。
+	 * @param disposable 要添加新的EventEmitter的可释放存储。
 	 *
 	 * @example
 	 * ```
-	 * // Fire only one time when a single window is opened or focused
+	 * // 当单个窗口被打开或聚焦时只触发一次
 	 * Event.latch(Event.any(onDidOpenWindow, onDidFocusWindow))
 	 * ```
 	 */
@@ -363,11 +389,11 @@ export namespace Event {
 	}
 
 	/**
-	 * Splits an event whose parameter is a union type into 2 separate events for each type in the union.
+	 * 将参数为联合类型的事件分割成联合中每种类型的2个单独事件。
 	 *
-	 * *NOTE* that this function returns an `Event` and it MUST be called with a `DisposableStore` whenever the returned
-	 * event is accessible to "third parties", e.g the event is a public property. Otherwise a leaked listener on the
-	 * returned event causes this utility to leak a listener on the original event.
+	 * *注意*，此函数返回一个`Event`，当返回的事件对"第三方"可访问时（例如，事件是公共属性），
+	 * 必须使用`DisposableStore`调用它。否则，返回事件上的泄漏监听器会导致此工具在原始事件上
+	 * 泄漏一个监听器。
 	 *
 	 * @example
 	 * ```
@@ -375,9 +401,9 @@ export namespace Event {
 	 * const [numberEvent, undefinedEvent] = Event.split(event, isUndefined);
 	 * ```
 	 *
-	 * @param event The event source for the new event.
-	 * @param isT A function that determines what event is of the first type.
-	 * @param disposable A disposable store to add the new EventEmitter to.
+	 * @param event 新事件的事件源。
+	 * @param isT 确定事件是否属于第一种类型的函数。
+	 * @param disposable 要添加新的EventEmitter的可释放存储。
 	 */
 	export function split<T, U>(event: Event<T | U>, isT: (e: T | U) => e is T, disposable?: DisposableStore): [Event<T>, Event<U>] {
 		return [
@@ -387,22 +413,20 @@ export namespace Event {
 	}
 
 	/**
-	 * Buffers an event until it has a listener attached.
+	 * 缓冲一个事件，直到它有一个监听器附加。
 	 *
-	 * *NOTE* that this function returns an `Event` and it MUST be called with a `DisposableStore` whenever the returned
-	 * event is accessible to "third parties", e.g the event is a public property. Otherwise a leaked listener on the
-	 * returned event causes this utility to leak a listener on the original event.
+	 * *注意*，此函数返回一个`Event`，当返回的事件对"第三方"可访问时（例如，事件是公共属性），
+	 * 必须使用`DisposableStore`调用它。否则，返回事件上的泄漏监听器会导致此工具在原始事件上
+	 * 泄漏一个监听器。
 	 *
-	 * @param event The event source for the new event.
-	 * @param flushAfterTimeout Determines whether to flush the buffer after a timeout immediately or after a
-	 * `setTimeout` when the first event listener is added.
-	 * @param _buffer Internal: A source event array used for tests.
+	 * @param event 新事件的事件源。
+	 * @param flushAfterTimeout 决定是立即在超时后刷新缓冲区，还是在添加第一个事件监听器后进行`setTimeout`。
+	 * @param _buffer 内部：用于测试的源事件数组。
 	 *
 	 * @example
 	 * ```
-	 * // Start accumulating events, when the first listener is attached, flush
-	 * // the event after a timeout such that multiple listeners attached before
-	 * // the timeout would receive the event
+	 * // 开始累积事件，当附加第一个监听器时，在超时后刷新
+	 * // 事件，使得超时前附加的多个监听器都能接收到事件
 	 * this.onInstallExtension = Event.buffer(service.onInstallExtension, true);
 	 * ```
 	 */
@@ -461,17 +485,17 @@ export namespace Event {
 		return emitter.event;
 	}
 	/**
-	 * Wraps the event in an {@link IChainableEvent}, allowing a more functional programming style.
+	 * 将事件包装在{@link IChainableEvent}中，允许更加函数式的编程风格。
 	 *
 	 * @example
 	 * ```
-	 * // Normal
+	 * // 普通方式
 	 * const onEnterPressNormal = Event.filter(
 	 *   Event.map(onKeyPress.event, e => new StandardKeyboardEvent(e)),
 	 *   e.keyCode === KeyCode.Enter
 	 * ).event;
 	 *
-	 * // Using chain
+	 * // 使用链式
 	 * const onEnterPressChain = Event.chain(onKeyPress.event, $ => $
 	 *   .map(e => new StandardKeyboardEvent(e))
 	 *   .filter(e => e.keyCode === KeyCode.Enter)
@@ -565,7 +589,7 @@ export namespace Event {
 	}
 
 	/**
-	 * Creates an {@link Event} from a node event emitter.
+	 * 从node事件发射器创建一个{@link Event}。
 	 */
 	export function fromNodeEventEmitter<T>(emitter: NodeEventEmitter, eventName: string, map: (...args: any[]) => T = id => id): Event<T> {
 		const fn = (...args: any[]) => result.fire(map(...args));
@@ -582,7 +606,7 @@ export namespace Event {
 	}
 
 	/**
-	 * Creates an {@link Event} from a DOM event emitter.
+	 * 从DOM事件发射器创建一个{@link Event}。
 	 */
 	export function fromDOMEventEmitter<T>(emitter: DOMEventEmitter, eventName: string, map: (...args: any[]) => T = id => id): Event<T> {
 		const fn = (...args: any[]) => result.fire(map(...args));
@@ -594,15 +618,14 @@ export namespace Event {
 	}
 
 	/**
-	 * Creates a promise out of an event, using the {@link Event.once} helper.
+	 * 使用{@link Event.once}帮助器从事件创建一个Promise。
 	 */
 	export function toPromise<T>(event: Event<T>, disposables?: IDisposable[] | DisposableStore): Promise<T> {
 		return new Promise(resolve => once(event)(resolve, null, disposables));
 	}
 
 	/**
-	 * Creates an event out of a promise that fires once when the promise is
-	 * resolved with the result of the promise or `undefined`.
+	 * 从Promise创建一个事件，该事件在Promise解析时使用Promise的结果或`undefined`触发一次。
 	 */
 	export function fromPromise<T>(promise: Promise<T>): Event<T | undefined> {
 		const result = new Emitter<T | undefined>();
@@ -619,18 +642,17 @@ export namespace Event {
 	}
 
 	/**
-	 * A convenience function for forwarding an event to another emitter which
-	 * improves readability.
+	 * 一个方便的函数，用于将事件转发到另一个发射器，提高可读性。
 	 *
-	 * This is similar to {@link Relay} but allows instantiating and forwarding
-	 * on a single line and also allows for multiple source events.
-	 * @param from The event to forward.
-	 * @param to The emitter to forward the event to.
+	 * 这类似于{@link Relay}，但允许在单行上实例化和转发，
+	 * 并且还允许多个源事件。
+	 * @param from 要转发的事件。
+	 * @param to 要将事件转发到的发射器。
 	 * @example
 	 * Event.forward(event, emitter);
-	 * // equivalent to
+	 * // 等同于
 	 * event(e => emitter.fire(e));
-	 * // equivalent to
+	 * // 等同于
 	 * event(emitter.fire, emitter);
 	 */
 	export function forward<T>(from: Event<T>, to: Emitter<T>): IDisposable {
@@ -638,11 +660,11 @@ export namespace Event {
 	}
 
 	/**
-	 * Adds a listener to an event and calls the listener immediately with undefined as the event object.
+	 * 向事件添加监听器，并立即使用undefined作为事件对象调用监听器。
 	 *
 	 * @example
 	 * ```
-	 * // Initialize the UI and update it when dataChangeEvent fires
+	 * // 初始化UI，并在dataChangeEvent触发时更新它
 	 * runAndSubscribe(dataChangeEvent, () => this._updateUI());
 	 * ```
 	 */
@@ -665,7 +687,7 @@ export namespace Event {
 				onWillAddFirstListener: () => {
 					_observable.addObserver(this);
 
-					// Communicate to the observable that we received its current value and would like to be notified about future changes.
+					// 向可观察对象通知我们收到了其当前值，并希望被通知未来的变化。
 					this._observable.reportChanges();
 				},
 				onDidRemoveLastListener: () => {
@@ -709,8 +731,8 @@ export namespace Event {
 	}
 
 	/**
-	 * Creates an event emitter that is fired when the observable changes.
-	 * Each listeners subscribes to the emitter.
+	 * 创建一个在可观察对象更改时触发的事件发射器。
+	 * 每个监听器都订阅发射器。
 	 */
 	export function fromObservable<T>(obs: IObservable<T>, store?: DisposableStore): Event<T> {
 		const observer = new EmitterObserver(obs, store);
@@ -718,7 +740,7 @@ export namespace Event {
 	}
 
 	/**
-	 * Each listener is attached to the observable directly.
+	 * 每个监听器都直接附加到可观察对象上。
 	 */
 	export function fromObservableLight(observable: IObservable<unknown>): Event<void> {
 		return (listener, thisArgs, disposables) => {
@@ -766,44 +788,44 @@ export namespace Event {
 
 export interface EmitterOptions {
 	/**
-	 * Optional function that's called *before* the very first listener is added
+	 * 可选函数，在添加第一个监听器*之前*调用
 	 */
 	onWillAddFirstListener?: Function;
 	/**
-	 * Optional function that's called *after* the very first listener is added
+	 * 可选函数，在添加第一个监听器*之后*调用
 	 */
 	onDidAddFirstListener?: Function;
 	/**
-	 * Optional function that's called after a listener is added
+	 * 可选函数，在添加监听器后调用
 	 */
 	onDidAddListener?: Function;
 	/**
-	 * Optional function that's called *after* remove the very last listener
+	 * 可选函数，在移除最后一个监听器*之后*调用
 	 */
 	onDidRemoveLastListener?: Function;
 	/**
-	 * Optional function that's called *before* a listener is removed
+	 * 可选函数，在移除监听器*之前*调用
 	 */
 	onWillRemoveListener?: Function;
 	/**
-	 * Optional function that's called when a listener throws an error. Defaults to
+	 * 当监听器抛出错误时调用的可选函数。默认为
 	 * {@link onUnexpectedError}
 	 */
 	onListenerError?: (e: any) => void;
 	/**
-	 * Number of listeners that are allowed before assuming a leak. Default to
-	 * a globally configured value
+	 * 在假定泄漏之前允许的监听器数量。默认为
+	 * 全局配置的值
 	 *
 	 * @see setGlobalLeakWarningThreshold
 	 */
 	leakWarningThreshold?: number;
 	/**
-	 * Pass in a delivery queue, which is useful for ensuring
-	 * in order event delivery across multiple emitters.
+	 * 传入一个传递队列，这对于确保
+	 * 多个发射器之间的事件按顺序传递非常有用。
 	 */
 	deliveryQueue?: EventDeliveryQueue;
 
-	/** ONLY enable this during development */
+	/** 仅在开发期间启用 */
 	_profName?: string;
 }
 
@@ -886,12 +908,11 @@ class LeakageMonitor {
 		this._warnCountdown -= 1;
 
 		if (this._warnCountdown <= 0) {
-			// only warn on first exceed and then every time the limit
-			// is exceeded by 50% again
+			// 仅在首次超出和此后每次超出限制的50%时警告
 			this._warnCountdown = threshold * 0.5;
 
 			const [topStack, topCount] = this.getMostFrequentStack()!;
-			const message = `[${this.name}] potential listener LEAK detected, having ${listenerCount} listeners already. MOST frequent listener (${topCount}):`;
+			const message = `[${this.name}] 检测到潜在的监听器泄漏，已有${listenerCount}个监听器。最频繁的监听器 (${topCount}):`;
 			console.warn(message);
 			console.warn(topStack!);
 
@@ -935,7 +956,7 @@ class Stacktrace {
 	}
 }
 
-// error that is logged when going over the configured listener threshold
+// 当超过配置的监听器阈值时记录的错误
 export class ListenerLeakError extends Error {
 	constructor(message: string, stack: string) {
 		super(message);
@@ -944,8 +965,7 @@ export class ListenerLeakError extends Error {
 	}
 }
 
-// SEVERE error that is logged when having gone way over the configured listener
-// threshold so that the emitter refuses to accept more listeners
+// 当远超过配置的监听器阈值，发射器拒绝接受更多监听器时记录的严重错误
 export class ListenerRefusalError extends Error {
 	constructor(message: string, stack: string) {
 		super(message);
@@ -1008,28 +1028,24 @@ export class Emitter<T> {
 	private _event?: Event<T>;
 
 	/**
-	 * A listener, or list of listeners. A single listener is the most common
-	 * for event emitters (#185789), so we optimize that special case to avoid
-	 * wrapping it in an array (just like Node.js itself.)
+	 * 一个监听器，或监听器列表。单个监听器是事件发射器最常见的情况
+	 * （#185789），因此我们优化这种特殊情况，避免将其包装在数组中
+	 * （就像Node.js本身一样）。
 	 *
-	 * A list of listeners never 'downgrades' back to a plain function if
-	 * listeners are removed, for two reasons:
+	 * 监听器列表在移除监听器时永远不会"降级"回普通函数，原因有两个：
 	 *
-	 *  1. That's complicated (especially with the deliveryQueue)
-	 *  2. A listener with >1 listener is likely to have >1 listener again at
-	 *     some point, and swapping between arrays and functions may[citation needed]
-	 *     introduce unnecessary work and garbage.
+	 *  1. 这很复杂（尤其是在有deliveryQueue的情况下）
+	 *  2. 拥有多个监听器的发射器很可能在某个时刻再次拥有多个监听器，
+	 *     在数组和函数之间切换可能[需要引用]会引入不必要的工作和垃圾。
 	 *
-	 * The array listeners can be 'sparse', to avoid reallocating the array
-	 * whenever any listener is added or removed. If more than `1 / compactionThreshold`
-	 * of the array is empty, only then is it resized.
+	 * 数组监听器可以是"稀疏的"，以避免在添加或删除任何监听器时重新分配数组。
+	 * 只有当数组中空元素超过`1 / compactionThreshold`比例时，才会调整其大小。
 	 */
 	protected _listeners?: ListenerOrListeners<T>;
 
 	/**
-	 * Always to be defined if _listeners is an array. It's no longer a true
-	 * queue, but holds the dispatching 'state'. If `fire()` is called on an
-	 * emitter, any work left in the _deliveryQueue is finished first.
+	 * 事件存储队列，循环派发了所有注册的事件， 事件会存储到一个事件队列，通过fire方法触发事件
+	 * 当_listeners是一个数组时，总是需要被定义。它不再是一个真正的队列，而是保存了分发的'状态'。如果在发射器上调用`fire()`，_deliveryQueue中剩余的任何工作都会首先完成。
 	 */
 	private _deliveryQueue?: EventDeliveryQueuePrivate;
 	protected _size = 0;
@@ -1047,15 +1063,14 @@ export class Emitter<T> {
 		if (!this._disposed) {
 			this._disposed = true;
 
-			// It is bad to have listeners at the time of disposing an emitter, it is worst to have listeners keep the emitter
-			// alive via the reference that's embedded in their disposables. Therefore we loop over all remaining listeners and
-			// unset their subscriptions/disposables. Looping and blaming remaining listeners is done on next tick because the
-			// the following programming pattern is very popular:
+			// 在释放发射器时仍有监听器是不好的，但更糟糕的是让监听器通过嵌入在其可释放对象中的引用使发射器保持活动状态。
+			// 因此，我们遍历所有剩余的监听器并取消设置它们的订阅/可释放对象。遍历并指责剩余的监听器是在下一个时钟周期完成的，
+			// 因为以下编程模式非常流行：
 			//
-			// const someModel = this._disposables.add(new ModelObject()); // (1) create and register model
-			// this._disposables.add(someModel.onDidChange(() => { ... }); // (2) subscribe and register model-event listener
-			// ...later...
-			// this._disposables.dispose(); disposes (1) then (2): don't warn after (1) but after the "overall dispose" is done
+			// const someModel = this._disposables.add(new ModelObject()); // (1) 创建并注册模型
+			// this._disposables.add(someModel.onDidChange(() => { ... }); // (2) 订阅并注册模型事件监听器
+			// ...稍后...
+			// this._disposables.dispose(); 释放 (1) 然后 (2)：不要在 (1) 之后警告，而是在"整体释放"完成后警告
 
 			if (this._deliveryQueue?.current === this) {
 				this._deliveryQueue.reset();
@@ -1083,11 +1098,11 @@ export class Emitter<T> {
 	get event(): Event<T> {
 		this._event ??= (callback: (e: T) => unknown, thisArgs?: any, disposables?: IDisposable[] | DisposableStore) => {
 			if (this._leakageMon && this._size > this._leakageMon.threshold ** 2) {
-				const message = `[${this._leakageMon.name}] REFUSES to accept new listeners because it exceeded its threshold by far (${this._size} vs ${this._leakageMon.threshold})`;
+				const message = `[${this._leakageMon.name}] 拒绝接受新的监听器，因为它远远超出了阈值(${this._size} vs ${this._leakageMon.threshold})`;
 				console.warn(message);
 
-				const tuple = this._leakageMon.getMostFrequentStack() ?? ['UNKNOWN stack', -1];
-				const error = new ListenerRefusalError(`${message}. HINT: Stack shows most frequent listener (${tuple[1]}-times)`, tuple[0]);
+				const tuple = this._leakageMon.getMostFrequentStack() ?? ['未知堆栈', -1];
+				const error = new ListenerRefusalError(`${message}. 提示: 堆栈显示最频繁的监听器 (${tuple[1]}次)`, tuple[0]);
 				const errorHandler = this._options?.onListenerError || onUnexpectedError;
 				errorHandler(error);
 
@@ -1095,7 +1110,7 @@ export class Emitter<T> {
 			}
 
 			if (this._disposed) {
-				// todo: should we warn if a listener is added to a disposed emitter? This happens often
+				// 疑问：如果监听器被添加到已释放的发射器，我们是否应该警告？这种情况经常发生
 				return Disposable.None;
 			}
 
@@ -1108,7 +1123,7 @@ export class Emitter<T> {
 			let removeMonitor: Function | undefined;
 			let stack: Stacktrace | undefined;
 			if (this._leakageMon && this._size >= Math.ceil(this._leakageMon.threshold * 0.2)) {
-				// check and record this emitter for potential leakage
+				// 检查并记录此发射器的潜在泄漏
 				contained.stack = Stacktrace.create();
 				removeMonitor = this._leakageMon.check(contained.stack, this._size + 1);
 			}
@@ -1152,7 +1167,7 @@ export class Emitter<T> {
 		this._options?.onWillRemoveListener?.(this);
 
 		if (!this._listeners) {
-			return; // expected if a listener gets disposed
+			return; // 如果监听器被释放，这是预期的
 		}
 
 		if (this._size === 1) {
@@ -1162,15 +1177,15 @@ export class Emitter<T> {
 			return;
 		}
 
-		// size > 1 which requires that listeners be a list:
+		// size > 1需要listeners是一个列表:
 		const listeners = this._listeners as (ListenerContainer<T> | undefined)[];
 
 		const index = listeners.indexOf(listener);
 		if (index === -1) {
-			console.log('disposed?', this._disposed);
-			console.log('size?', this._size);
-			console.log('arr?', JSON.stringify(this._listeners));
-			throw new Error('Attempted to dispose unknown listener');
+			console.log('已释放?', this._disposed);
+			console.log('大小?', this._size);
+			console.log('数组?', JSON.stringify(this._listeners));
+			throw new Error('尝试释放未知的监听器');
 		}
 
 		this._size--;
@@ -1211,30 +1226,30 @@ export class Emitter<T> {
 		}
 	}
 
-	/** Delivers items in the queue. Assumes the queue is ready to go. */
+	/** 传递队列中的项目。假设队列已准备好。 */
 	private _deliverQueue(dq: EventDeliveryQueuePrivate) {
 		const listeners = dq.current!._listeners! as (ListenerContainer<T> | undefined)[];
 		while (dq.i < dq.end) {
-			// important: dq.i is incremented before calling deliver() because it might reenter deliverQueue()
+			// 重要：在调用deliver()之前增加dq.i，因为它可能会重新进入deliverQueue()
 			this._deliver(listeners[dq.i++], dq.value as T);
 		}
 		dq.reset();
 	}
 
 	/**
-	 * To be kept private to fire an event to
-	 * subscribers
+	 * 保持私有以向订阅者触发事件
+	 * 从队列中获取事件，并触发事件
 	 */
 	fire(event: T): void {
 		if (this._deliveryQueue?.current) {
 			this._deliverQueue(this._deliveryQueue);
-			this._perfMon?.stop(); // last fire() will have starting perfmon, stop it before starting the next dispatch
+			this._perfMon?.stop(); // 最后一次fire()将启动perfmon，在开始下一次分发前停止它
 		}
 
 		this._perfMon?.start(this._size);
 
 		if (!this._listeners) {
-			// no-op
+			// 无操作
 		} else if (this._listeners instanceof UniqueContainer) {
 			this._deliver(this._listeners, event);
 		} else {
@@ -1261,21 +1276,21 @@ class EventDeliveryQueuePrivate implements EventDeliveryQueue {
 	declare _isEventDeliveryQueue: true;
 
 	/**
-	 * Index in current's listener list.
+	 * 当前监听器列表中的索引。
 	 */
 	public i = -1;
 
 	/**
-	 * The last index in the listener's list to deliver.
+	 * 监听器列表中要传递的最后一个索引。
 	 */
 	public end = 0;
 
 	/**
-	 * Emitter currently being dispatched on. Emitter._listeners is always an array.
+	 * 当前正在分发的发射器。Emitter._listeners始终是一个数组。
 	 */
 	public current?: Emitter<any>;
 	/**
-	 * Currently emitting value. Defined whenever `current` is.
+	 * 当前正在发出的值。当'current'定义时定义。
 	 */
 	public value?: unknown;
 
@@ -1287,7 +1302,7 @@ class EventDeliveryQueuePrivate implements EventDeliveryQueue {
 	}
 
 	public reset() {
-		this.i = this.end; // force any current emission loop to stop, mainly for during dispose
+		this.i = this.end; // 强制任何当前的发射循环停止，主要用于释放期间
 		this.current = undefined;
 		this.value = undefined;
 	}
@@ -1326,7 +1341,7 @@ export class AsyncEmitter<T extends IWaitUntil> extends Emitter<T> {
 				token,
 				waitUntil: (p: Promise<unknown>): void => {
 					if (Object.isFrozen(thenables)) {
-						throw new Error('waitUntil can NOT be called asynchronous');
+						throw new Error('waitUntil不能异步调用');
 					}
 					if (promiseJoin) {
 						p = promiseJoin(p, listener);
@@ -1342,8 +1357,8 @@ export class AsyncEmitter<T extends IWaitUntil> extends Emitter<T> {
 				continue;
 			}
 
-			// freeze thenables-collection to enforce sync-calls to
-			// wait until and then wait for all thenables to resolve
+			// 冻结thenables集合以强制对wait until的同步调用，
+			// 然后等待所有thenables解析
 			Object.freeze(thenables);
 
 			await Promise.allSettled(thenables).then(values => {
@@ -1380,8 +1395,8 @@ export class PauseableEmitter<T> extends Emitter<T> {
 	resume(): void {
 		if (this._isPaused !== 0 && --this._isPaused === 0) {
 			if (this._mergeFn) {
-				// use the merge function to create a single composite
-				// event. make a copy in case firing pauses this emitter
+				// 使用合并函数创建一个单一的复合事件。
+				// 制作一个副本，以防触发暂停此发射器
 				if (this._eventQueue.size > 0) {
 					const events = Array.from(this._eventQueue);
 					this._eventQueue.clear();
@@ -1389,8 +1404,8 @@ export class PauseableEmitter<T> extends Emitter<T> {
 				}
 
 			} else {
-				// no merging, fire each event individually and test
-				// that this emitter isn't paused halfway through
+				// 没有合并，单独触发每个事件并测试
+				// 这个发射器是否在中途暂停
 				while (!this._isPaused && this._eventQueue.size !== 0) {
 					super.fire(this._eventQueue.shift()!);
 				}
@@ -1432,8 +1447,7 @@ export class DebounceEmitter<T> extends PauseableEmitter<T> {
 }
 
 /**
- * An emitter which queue all events and then process them at the
- * end of the event loop.
+ * 一个发射器，它将所有事件排队，然后在事件循环结束时处理它们。
  */
 export class MicrotaskEmitter<T> extends Emitter<T> {
 	private _queuedEvents: T[] = [];
@@ -1464,10 +1478,9 @@ export class MicrotaskEmitter<T> extends Emitter<T> {
 }
 
 /**
- * An event emitter that multiplexes many events into a single event.
+ * 一个事件发射器，将多个事件多路复用成一个单一事件。
  *
- * @example Listen to the `onData` event of all `Thing`s, dynamically adding and removing `Thing`s
- * to the multiplexer as needed.
+ * @example 监听所有`Thing`的`onData`事件，根据需要动态添加和移除`Thing`到多路复用器。
  *
  * ```typescript
  * const anythingDataMultiplexer = new EventMultiplexer<{ data: string }>();
@@ -1573,17 +1586,17 @@ export class DynamicListEventMultiplexer<TItem, TEventType> implements IDynamicL
 			itemListeners.set(instance, multiplexer.add(getEvent(instance)));
 		}
 
-		// Existing items
+		// 现有项目
 		for (const instance of items) {
 			addItem(instance);
 		}
 
-		// Added items
+		// 添加项目
 		this._store.add(onAddItem(instance => {
 			addItem(instance);
 		}));
 
-		// Removed items
+		// 移除项目
 		this._store.add(onRemoveItem(instance => {
 			itemListeners.deleteAndDispose(instance);
 		}));
@@ -1597,10 +1610,8 @@ export class DynamicListEventMultiplexer<TItem, TEventType> implements IDynamicL
 }
 
 /**
- * The EventBufferer is useful in situations in which you want
- * to delay firing your events during some code.
- * You can wrap that code and be sure that the event will not
- * be fired during that wrap.
+ * EventBufferer在某些代码期间想要延迟触发事件的情况下很有用。
+ * 你可以包装那段代码，并确保在那个包装期间不会触发事件。
  *
  * ```
  * const emitter: Emitter;
@@ -1610,10 +1621,10 @@ export class DynamicListEventMultiplexer<TItem, TEventType> implements IDynamicL
  * delayedEvent(console.log);
  *
  * delayer.bufferEvents(() => {
- *   emitter.fire(); // event will not be fired yet
+ *   emitter.fire(); // 事件还不会被触发
  * });
  *
- * // event will only be fired at this point
+ * // 事件只会在此时触发
  * ```
  */
 export class EventBufferer {
@@ -1628,44 +1639,44 @@ export class EventBufferer {
 			return event(i => {
 				const data = this.data[this.data.length - 1];
 
-				// Non-reduce scenario
+				// 非减少场景
 				if (!reduce) {
-					// Buffering case
+					// 缓冲情况
 					if (data) {
 						data.buffers.push(() => listener.call(thisArgs, i));
 					} else {
-						// Not buffering case
+						// 非缓冲情况
 						listener.call(thisArgs, i);
 					}
 					return;
 				}
 
-				// Reduce scenario
+				// 减少场景
 				const reduceData = data as typeof data & {
 					/**
-					 * The accumulated items that will be reduced.
+					 * 将被减少的累积项。
 					 */
 					items?: T[];
 					/**
-					 * The reduced result cached to be shared with other listeners.
+					 * 缓存的减少结果，与其他监听器共享。
 					 */
 					reducedResult?: T | O;
 				};
 
-				// Not buffering case
+				// 非缓冲情况
 				if (!reduceData) {
-					// TODO: Is there a way to cache this reduce call for all listeners?
+					// TODO: 是否有办法为所有监听器缓存这个reduce调用？
 					listener.call(thisArgs, reduce(initial, i));
 					return;
 				}
 
-				// Buffering case
+				// 缓冲情况
 				reduceData.items ??= [];
 				reduceData.items.push(i);
 				if (reduceData.buffers.length === 0) {
-					// Include a single buffered function that will reduce all events when we're done buffering events
+					// 包含一个缓冲函数，当我们完成缓冲事件时将减少所有事件
 					data.buffers.push(() => {
-						// cache the reduced result so that the value can be shared across all listeners
+						// 缓存减少的结果，以便该值可以在所有监听器之间共享
 						reduceData.reducedResult ??= initial
 							? reduceData.items!.reduce(reduce as (last: O | undefined, event: T) => O, initial)
 							: reduceData.items!.reduce(reduce as (last: T | undefined, event: T) => T);
@@ -1687,10 +1698,9 @@ export class EventBufferer {
 }
 
 /**
- * A Relay is an event forwarder which functions as a replugabble event pipe.
- * Once created, you can connect an input event to it and it will simply forward
- * events from that input event through its own `event` property. The `input`
- * can be changed at any point in time.
+ * Relay是一个事件转发器，它作为一个可重新插接的事件管道。
+ * 创建后，你可以将输入事件连接到它和它将简单地通过自己的`event`属性
+ * 转发来自该输入事件的事件。`input`可以在任何时候更改。
  */
 export class Relay<T> implements IDisposable {
 
@@ -1760,8 +1770,8 @@ class ConstValueWithChangeEvent<T> implements IValueWithChangeEvent<T> {
 }
 
 /**
- * @param handleItem Is called for each item in the set (but only the first time the item is seen in the set).
- * 	The returned disposable is disposed if the item is no longer in the set.
+ * @param handleItem 为集合中的每个项目调用（但仅在第一次在集合中看到该项目时）。
+ * 	如果该项目不再在集合中，则释放返回的可释放对象。
  */
 export function trackSetChanges<T>(getData: () => ReadonlySet<T>, onDidChangeData: Event<unknown>, handleItem: (d: T) => IDisposable): IDisposable {
 	const map = new DisposableMap<T, IDisposable>();

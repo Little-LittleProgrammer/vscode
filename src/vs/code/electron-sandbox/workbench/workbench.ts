@@ -1,13 +1,40 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *  Copyright (c) Microsoft Corporation. 保留所有权利。
+ *  使用MIT许可证。有关许可信息，请参阅项目根目录中的License.txt。
  *--------------------------------------------------------------------------------------------*/
 
 /* eslint-disable no-restricted-globals */
 
+/**
+ * 这个 workbench.ts 文件是 VSCode 编辑器启动过程的核心入口点，负责初始化和加载 VSCode 的工作台（即用户界面）。以下是其主要功能：
+ *	1. 初始化和启动流程
+ *		此文件是一个立即执行的异步函数，作为 VSCode 窗口的第一个启动脚本
+ *		在渲染进程启动时记录性能标记，用于性能分析
+ *		获取 Electron 窗口环境中的全局对象和配置信息
+ *	2. 启动画面（Splash Screen）处理
+ *		显示一个启动画面，在实际工作台加载前向用户提供视觉反馈
+ *		根据用户的主题设置（亮色/暗色/高对比度）应用适当的颜色样式
+ *		根据保存的布局信息重建 VSCode 界面的主要部分，包括：
+ *			标题栏
+ *			活动栏（左侧的图标栏）
+ *			侧边栏
+ *			辅助侧边栏
+ *			状态栏
+ *	3. 窗口配置与优化
+ *		设置适当的缩放级别
+ *		为窗口添加唯一标识符（vscodeWindowId）
+ *		在浏览器空闲时提前初始化 Canvas 元素，避免后续使用时的延迟
+ *	4. 开发者设置配置
+ *		配置开发者工具的行为，例如在扩展开发时启用特定的快捷键
+ *		在测试环境中禁用自动打开开发工具，避免干扰测试执行
+ *	5. 工作台加载
+ *		通过 bootstrapWindow.load 加载主工作台模块 ('vs/workbench/workbench.desktop.main')
+ *		记录加载时间点以进行性能分析
+ *		将配置信息传递给工作台主模块并初始化
+ */
 (async function () {
 
-	// Add a perf entry right from the top
+	// 在最开始添加性能标记
 	performance.mark('code/didStartRenderer');
 
 	type INativeWindowConfiguration = import('../../../platform/window/common/window.ts').INativeWindowConfiguration;
@@ -15,10 +42,10 @@
 	type IMainWindowSandboxGlobals = import('../../../base/parts/sandbox/electron-sandbox/globals.js').IMainWindowSandboxGlobals;
 	type IDesktopMain = import('../../../workbench/electron-sandbox/desktop.main.js').IDesktopMain;
 
-	const bootstrapWindow: IBootstrapWindow = (window as any).MonacoBootstrapWindow; 	// defined by bootstrap-window.ts
-	const preloadGlobals: IMainWindowSandboxGlobals = (window as any).vscode; 			// defined by preload.ts
+	const bootstrapWindow: IBootstrapWindow = (window as any).MonacoBootstrapWindow; 	// 由bootstrap-window.ts定义
+	const preloadGlobals: IMainWindowSandboxGlobals = (window as any).vscode; 			// 由preload.ts定义
 
-	//#region Splash Screen Helpers
+	//#region 启动画面辅助函数
 
 	function showSplash(configuration: INativeWindowConfiguration) {
 		performance.mark('code/willShowPartsSplash');
@@ -27,21 +54,21 @@
 		if (data) {
 			if (configuration.autoDetectHighContrast && configuration.colorScheme.highContrast) {
 				if ((configuration.colorScheme.dark && data.baseTheme !== 'hc-black') || (!configuration.colorScheme.dark && data.baseTheme !== 'hc-light')) {
-					data = undefined; // high contrast mode has been turned by the OS -> ignore stored colors and layouts
+					data = undefined; // 系统已开启高对比度模式 -> 忽略存储的颜色和布局
 				}
 			} else if (configuration.autoDetectColorScheme) {
 				if ((configuration.colorScheme.dark && data.baseTheme !== 'vs-dark') || (!configuration.colorScheme.dark && data.baseTheme !== 'vs')) {
-					data = undefined; // OS color scheme is tracked and has changed
+					data = undefined; // 跟踪的操作系统颜色方案已更改
 				}
 			}
 		}
 
-		// developing an extension -> ignore stored layouts
+		// 开发扩展时 -> 忽略存储的布局
 		if (data && configuration.extensionDevelopmentPath) {
 			data.layoutInfo = undefined;
 		}
 
-		// minimal color configuration (works with or without persisted data)
+		// 最小颜色配置（有无持久化数据均可工作）
 		let baseTheme;
 		let shellBackground;
 		let shellForeground;
@@ -76,12 +103,12 @@
 		window.document.head.appendChild(style);
 		style.textContent = `body {	background-color: ${shellBackground}; color: ${shellForeground}; margin: 0; padding: 0; }`;
 
-		// set zoom level as soon as possible
+		// 尽快设置缩放级别
 		if (typeof data?.zoomLevel === 'number' && typeof preloadGlobals?.webFrame?.setZoomLevel === 'function') {
 			preloadGlobals.webFrame.setZoomLevel(data.zoomLevel);
 		}
 
-		// restore parts if possible (we might not always store layout info)
+		// 如果可能，恢复各部分（我们可能不总是存储布局信息）
 		if (data?.layoutInfo) {
 			const { layoutInfo, colorInfo } = data;
 
@@ -94,7 +121,7 @@
 				borderElement.style.position = 'absolute';
 				borderElement.style.width = 'calc(100vw - 2px)';
 				borderElement.style.height = 'calc(100vh - 2px)';
-				borderElement.style.zIndex = '1'; // allow border above other elements
+				borderElement.style.zIndex = '1'; // 允许边框显示在其他元素之上
 				borderElement.style.border = `1px solid var(--window-border-color)`;
 				borderElement.style.setProperty('--window-border-color', colorInfo.windowBorder);
 
@@ -105,11 +132,11 @@
 				splash.appendChild(borderElement);
 			}
 
-			// ensure there is enough space
+			// 确保有足够的空间
 			layoutInfo.auxiliarySideBarWidth = Math.min(layoutInfo.auxiliarySideBarWidth, window.innerWidth - (layoutInfo.activityBarWidth + layoutInfo.editorPartMinWidth + layoutInfo.sideBarWidth));
 			layoutInfo.sideBarWidth = Math.min(layoutInfo.sideBarWidth, window.innerWidth - (layoutInfo.activityBarWidth + layoutInfo.editorPartMinWidth + layoutInfo.auxiliarySideBarWidth));
 
-			// part: title
+			// 部分：标题栏
 			if (layoutInfo.titleBarHeight > 0) {
 				const titleDiv = document.createElement('div');
 				titleDiv.style.position = 'absolute';
@@ -133,7 +160,7 @@
 				}
 			}
 
-			// part: activity bar
+			// 部分：活动栏
 			if (layoutInfo.activityBarWidth > 0) {
 				const activityDiv = document.createElement('div');
 				activityDiv.style.position = 'absolute';
@@ -165,7 +192,7 @@
 				}
 			}
 
-			// part: side bar
+			// 部分：侧边栏
 			if (layoutInfo.sideBarWidth > 0) {
 				const sideDiv = document.createElement('div');
 				sideDiv.style.position = 'absolute';
@@ -197,7 +224,7 @@
 				}
 			}
 
-			// part: auxiliary sidebar
+			// 部分：辅助侧边栏
 			if (layoutInfo.auxiliarySideBarWidth > 0) {
 				const auxSideDiv = document.createElement('div');
 				auxSideDiv.style.position = 'absolute';
@@ -229,7 +256,7 @@
 				}
 			}
 
-			// part: statusbar
+			// 部分：状态栏
 			if (layoutInfo.statusBarHeight > 0) {
 				const statusDiv = document.createElement('div');
 				statusDiv.style.position = 'absolute';
@@ -267,30 +294,28 @@
 		{
 			configureDeveloperSettings: function (windowConfig) {
 				return {
-					// disable automated devtools opening on error when running extension tests
-					// as this can lead to nondeterministic test execution (devtools steals focus)
+					// 在运行扩展测试时禁用错误时自动打开开发工具
+					// 因为这会导致测试执行不确定性（开发工具会抢占焦点）
 					forceDisableShowDevtoolsOnError: typeof windowConfig.extensionTestsPath === 'string' || windowConfig['enable-smoke-test-driver'] === true,
-					// enable devtools keybindings in extension development window
+					// 在扩展开发窗口中启用开发工具快捷键
 					forceEnableDeveloperKeybindings: Array.isArray(windowConfig.extensionDevelopmentPath) && windowConfig.extensionDevelopmentPath.length > 0,
 					removeDeveloperKeybindingsAfterLoad: true
 				};
 			},
 			beforeImport: function (windowConfig) {
 
-				// Show our splash as early as possible
+				// 尽早显示启动画面
 				showSplash(windowConfig);
 
-				// Code windows have a `vscodeWindowId` property to identify them
+				// Code窗口有一个`vscodeWindowId`属性来标识它们
 				Object.defineProperty(window, 'vscodeWindowId', {
 					get: () => windowConfig.windowId
 				});
 
-				// It looks like browsers only lazily enable
-				// the <canvas> element when needed. Since we
-				// leverage canvas elements in our code in many
-				// locations, we try to help the browser to
-				// initialize canvas when it is idle, right
-				// before we wait for the scripts to be loaded.
+				// 浏览器似乎只在需要时才懒加载启用<canvas>元素。
+				// 由于我们在代码中的许多位置利用了canvas元素，
+				// 我们尝试在浏览器空闲时帮助浏览器初始化canvas，
+				// 就在我们等待脚本加载之前。
 				window.requestIdleCallback(() => {
 					const canvas = document.createElement('canvas');
 					const context = canvas.getContext('2d');
@@ -298,15 +323,15 @@
 					canvas.remove();
 				}, { timeout: 50 });
 
-				// Track import() perf
+				// 跟踪import()性能
 				performance.mark('code/willLoadWorkbenchMain');
 			}
 		}
 	);
 
-	// Mark start of workbench
+	// 标记工作台开始
 	performance.mark('code/didLoadWorkbenchMain');
 
-	// Load workbench
+	// 加载工作台
 	result.main(configuration);
 }());

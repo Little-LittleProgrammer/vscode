@@ -287,6 +287,7 @@ export class ProcessMainService implements IProcessMainService {
 	}
 
 	async stopTracing(): Promise<void> {
+		this.logService.info('【trace】停止跟踪， 性能分析');
 		if (!this.environmentMainService.args.trace) {
 			return; // requires tracing to be on
 		}

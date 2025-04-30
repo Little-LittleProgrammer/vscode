@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *  Copyright (c) Microsoft Corporation. 保留所有权利。
+ *  使用MIT许可证。有关许可信息，请参阅项目根目录中的License.txt。
  *--------------------------------------------------------------------------------------------*/
 
 import { localize } from '../../nls.js';
@@ -65,6 +65,9 @@ import { DefaultAccountService, IDefaultAccountService } from '../services/accou
 import { AccountPolicyService } from '../services/policies/common/accountPolicyService.js';
 import { MultiplexPolicyService } from '../services/policies/common/multiplexPolicyService.js';
 
+/**
+ * VSCode桌面版的主类，负责初始化和启动整个工作台
+ */
 export class DesktopMain extends Disposable {
 
 	constructor(
@@ -75,24 +78,30 @@ export class DesktopMain extends Disposable {
 		this.init();
 	}
 
+	/**
+	 * 初始化桌面主实例
+	 */
 	private init(): void {
 
-		// Massage configuration file URIs
+		// 处理配置文件URI
 		this.reviveUris();
 
-		// Apply fullscreen early if configured
+		// 如果配置中指定了全屏模式，则尽早应用
 		setFullscreen(!!this.configuration.fullscreen, mainWindow);
 	}
 
+	/**
+	 * 恢复配置中的URI对象
+	 */
 	private reviveUris() {
 
-		// Workspace
+		// 工作区
 		const workspace = reviveIdentifier(this.configuration.workspace);
 		if (isWorkspaceIdentifier(workspace) || isSingleFolderWorkspaceIdentifier(workspace)) {
 			this.configuration.workspace = workspace;
 		}
 
-		// Files
+		// 文件
 		const filesToWait = this.configuration.filesToWait;
 		const filesToWaitPaths = filesToWait?.paths;
 		for (const paths of [filesToWaitPaths, this.configuration.filesToOpenOrCreate, this.configuration.filesToDiff, this.configuration.filesToMerge]) {
@@ -110,33 +119,37 @@ export class DesktopMain extends Disposable {
 		}
 	}
 
+	/**
+	 * 打开工作台
+	 */
 	async open(): Promise<void> {
 
-		// Init services and wait for DOM to be ready in parallel
+		// 并行初始化服务并等待DOM准备就绪
 		const [services] = await Promise.all([this.initServices(), domContentLoaded(mainWindow)]);
 
-		// Apply zoom level early once we have a configuration service
-		// and before the workbench is created to prevent flickering.
-		// We also need to respect that zoom level can be configured per
-		// workspace, so we need the resolved configuration service.
-		// Finally, it is possible for the window to have a custom
-		// zoom level that is not derived from settings.
-		// (fixes https://github.com/microsoft/vscode/issues/187982)
+		// 在创建工作台之前尽早应用缩放级别以防闪烁。
+		// 我们还需要考虑缩放级别可以根据工作区进行配置，
+		// 因此需要已解析的配置服务。
+		// 最后，窗口可能有一个不是从设置派生的自定义缩放级别。
+		// (修复 https://github.com/microsoft/vscode/issues/187982)
 		this.applyWindowZoomLevel(services.configurationService);
 
-		// Create Workbench
+		// 创建工作台
 		const workbench = new Workbench(mainWindow.document.body, { extraClasses: this.getExtraClasses() }, services.serviceCollection, services.logService);
 
-		// Listeners
+		// 注册监听器
 		this.registerListeners(workbench, services.storageService);
 
-		// Startup
+		// 启动
 		const instantiationService = workbench.startup();
 
-		// Window
+		// 窗口
 		this._register(instantiationService.createInstance(NativeWindow));
 	}
 
+	/**
+	 * 应用窗口缩放级别
+	 */
 	private applyWindowZoomLevel(configurationService: IConfigurationService) {
 		let zoomLevel: number | undefined = undefined;
 		if (this.configuration.isCustomZoomLevel && typeof this.configuration.zoomLevel === 'number') {
@@ -149,6 +162,9 @@ export class DesktopMain extends Disposable {
 		applyZoom(zoomLevel, mainWindow);
 	}
 
+	/**
+	 * 获取额外的CSS类
+	 */
 	private getExtraClasses(): string[] {
 		if (isMacintosh && isBigSurOrNewer(this.configuration.os.release)) {
 			return ['macos-bigsur-or-newer'];
@@ -157,59 +173,64 @@ export class DesktopMain extends Disposable {
 		return [];
 	}
 
+	/**
+	 * 注册监听器
+	 */
 	private registerListeners(workbench: Workbench, storageService: NativeWorkbenchStorageService): void {
 
-		// Workbench Lifecycle
-		this._register(workbench.onWillShutdown(event => event.join(storageService.close(), { id: 'join.closeStorage', label: localize('join.closeStorage', "Saving UI state") })));
+		// 工作台生命周期
+		this._register(workbench.onWillShutdown(event => event.join(storageService.close(), { id: 'join.closeStorage', label: localize('join.closeStorage', "正在保存UI状态") })));
 		this._register(workbench.onDidShutdown(() => this.dispose()));
 	}
 
+	/**
+	 * 初始化服务
+	 */
 	private async initServices(): Promise<{ serviceCollection: ServiceCollection; logService: ILogService; storageService: NativeWorkbenchStorageService; configurationService: IConfigurationService }> {
 		const serviceCollection = new ServiceCollection();
 
 
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		//
-		// NOTE: Please do NOT register services here. Use `registerSingleton()`
-		//       from `workbench.common.main.ts` if the service is shared between
-		//       desktop and web or `workbench.desktop.main.ts` if the service
-		//       is desktop only.
+		// 注意: 请不要在这里注册服务。如果服务在桌面和Web之间共享，
+		//      请使用`workbench.common.main.ts`中的`registerSingleton()`；
+		//      如果服务仅限桌面使用，请使用`workbench.desktop.main.ts`。
 		//
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-		// Main Process
+		// 主进程
 		const mainProcessService = this._register(new ElectronIPCMainProcessService(this.configuration.windowId));
 		serviceCollection.set(IMainProcessService, mainProcessService);
 
-		// Product
+		// 产品
 		const productService: IProductService = { _serviceBrand: undefined, ...product };
 		serviceCollection.set(IProductService, productService);
 
-		// Environment
+		// 环境
 		const environmentService = new NativeWorkbenchEnvironmentService(this.configuration, productService);
 		serviceCollection.set(INativeWorkbenchEnvironmentService, environmentService);
 
-		// Logger
+		// 日志器
 		const loggers = this.configuration.loggers.map(loggerResource => ({ ...loggerResource, resource: URI.revive(loggerResource.resource) }));
 		const loggerService = new LoggerChannelClient(this.configuration.windowId, this.configuration.logLevel, environmentService.windowLogsPath, loggers, mainProcessService.getChannel('logger'));
 		serviceCollection.set(ILoggerService, loggerService);
 
-		// Log
+		// 日志
 		const logService = this._register(new NativeLogService(loggerService, environmentService));
 		serviceCollection.set(ILogService, logService);
 		if (isCI) {
-			logService.info('workbench#open()'); // marking workbench open helps to diagnose flaky integration/smoke tests
+			logService.info('workbench#open()'); // 标记工作台打开有助于诊断不稳定的集成/冒烟测试
 		}
 		if (logService.getLevel() === LogLevel.Trace) {
-			logService.trace('workbench#open(): with configuration', safeStringify({ ...this.configuration, nls: undefined /* exclude large property */ }));
+			logService.trace('workbench#open(): with configuration', safeStringify({ ...this.configuration, nls: undefined /* 排除大型属性 */ }));
 		}
 
-		// Default Account
+		// 默认账户
 		const defaultAccountService = this._register(new DefaultAccountService());
 		serviceCollection.set(IDefaultAccountService, defaultAccountService);
 
-		// Policies
+		// 策略
 		let policyService: IPolicyService;
 		const accountPolicy = new AccountPolicyService(logService, defaultAccountService);
 		if (this.configuration.policiesData) {
@@ -220,82 +241,80 @@ export class DesktopMain extends Disposable {
 		}
 		serviceCollection.set(IPolicyService, policyService);
 
-		// Shared Process
+		// 共享进程
 		const sharedProcessService = new SharedProcessService(this.configuration.windowId, logService);
 		serviceCollection.set(ISharedProcessService, sharedProcessService);
 
-		// Utility Process Worker
+		// 实用程序进程工作器
 		const utilityProcessWorkerWorkbenchService = new UtilityProcessWorkerWorkbenchService(this.configuration.windowId, logService, mainProcessService);
 		serviceCollection.set(IUtilityProcessWorkerWorkbenchService, utilityProcessWorkerWorkbenchService);
 
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		//
-		// NOTE: Please do NOT register services here. Use `registerSingleton()`
-		//       from `workbench.common.main.ts` if the service is shared between
-		//       desktop and web or `workbench.desktop.main.ts` if the service
-		//       is desktop only.
+		// 注意: 请不要在这里注册服务。如果服务在桌面和Web之间共享，
+		//      请使用`workbench.common.main.ts`中的`registerSingleton()`；
+		//      如果服务仅限桌面使用，请使用`workbench.desktop.main.ts`。
 		//
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-		// Sign
+		// 签名
 		const signService = ProxyChannel.toService<ISignService>(mainProcessService.getChannel('sign'));
 		serviceCollection.set(ISignService, signService);
 
-		// Files
+		// 文件
 		const fileService = this._register(new FileService(logService));
 		serviceCollection.set(IFileService, fileService);
 
-		// Remote
+		// 远程
 		const remoteAuthorityResolverService = new RemoteAuthorityResolverService(productService, new ElectronRemoteResourceLoader(environmentService.window.id, mainProcessService, fileService));
 		serviceCollection.set(IRemoteAuthorityResolverService, remoteAuthorityResolverService);
 
-		// Local Files
+		// 本地文件
 		const diskFileSystemProvider = this._register(new DiskFileSystemProvider(mainProcessService, utilityProcessWorkerWorkbenchService, logService, loggerService));
 		fileService.registerProvider(Schemas.file, diskFileSystemProvider);
 
-		// URI Identity
+		// URI标识
 		const uriIdentityService = new UriIdentityService(fileService);
 		serviceCollection.set(IUriIdentityService, uriIdentityService);
 
-		// User Data Profiles
+		// 用户数据配置文件
 		const userDataProfilesService = new UserDataProfilesService(this.configuration.profiles.all, URI.revive(this.configuration.profiles.home).with({ scheme: environmentService.userRoamingDataHome.scheme }), mainProcessService.getChannel('userDataProfiles'));
 		serviceCollection.set(IUserDataProfilesService, userDataProfilesService);
 		const userDataProfileService = new UserDataProfileService(reviveProfile(this.configuration.profiles.profile, userDataProfilesService.profilesHome.scheme));
 		serviceCollection.set(IUserDataProfileService, userDataProfileService);
 
-		// Use FileUserDataProvider for user data to
-		// enable atomic read / write operations.
+		// 为用户数据使用FileUserDataProvider
+		// 以启用原子读/写操作。
 		fileService.registerProvider(Schemas.vscodeUserData, this._register(new FileUserDataProvider(Schemas.file, diskFileSystemProvider, Schemas.vscodeUserData, userDataProfilesService, uriIdentityService, logService)));
 
-		// Remote Agent
+		// 远程代理
 		const remoteSocketFactoryService = new RemoteSocketFactoryService();
 		remoteSocketFactoryService.register(RemoteConnectionType.WebSocket, new BrowserSocketFactory(null));
 		serviceCollection.set(IRemoteSocketFactoryService, remoteSocketFactoryService);
 		const remoteAgentService = this._register(new RemoteAgentService(remoteSocketFactoryService, userDataProfileService, environmentService, productService, remoteAuthorityResolverService, signService, logService));
 		serviceCollection.set(IRemoteAgentService, remoteAgentService);
 
-		// Remote Files
+		// 远程文件
 		this._register(RemoteFileSystemProviderClient.register(remoteAgentService, fileService, logService));
 
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		//
-		// NOTE: Please do NOT register services here. Use `registerSingleton()`
-		//       from `workbench.common.main.ts` if the service is shared between
-		//       desktop and web or `workbench.desktop.main.ts` if the service
-		//       is desktop only.
+		// 注意: 请不要在这里注册服务。如果服务在桌面和Web之间共享，
+		//      请使用`workbench.common.main.ts`中的`registerSingleton()`；
+		//      如果服务仅限桌面使用，请使用`workbench.desktop.main.ts`。
 		//
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-		// Create services that require resolving in parallel
+		// 并行创建需要解析的服务
 		const workspace = this.resolveWorkspaceIdentifier(environmentService);
 		const [configurationService, storageService] = await Promise.all([
 			this.createWorkspaceService(workspace, environmentService, userDataProfileService, userDataProfilesService, fileService, remoteAgentService, uriIdentityService, logService, policyService).then(service => {
 
-				// Workspace
+				// 工作区
 				serviceCollection.set(IWorkspaceContextService, service);
 
-				// Configuration
+				// 配置
 				serviceCollection.set(IWorkbenchConfigurationService, service);
 
 				return service;
@@ -303,7 +322,7 @@ export class DesktopMain extends Disposable {
 
 			this.createStorageService(workspace, environmentService, userDataProfileService, userDataProfilesService, mainProcessService).then(service => {
 
-				// Storage
+				// 存储
 				serviceCollection.set(IStorageService, service);
 
 				return service;
@@ -311,31 +330,30 @@ export class DesktopMain extends Disposable {
 
 			this.createKeyboardLayoutService(mainProcessService).then(service => {
 
-				// KeyboardLayout
+				// 键盘布局
 				serviceCollection.set(INativeKeyboardLayoutService, service);
 
 				return service;
 			})
 		]);
 
-		// Workspace Trust Service
+		// 工作区信任服务
 		const workspaceTrustEnablementService = new WorkspaceTrustEnablementService(configurationService, environmentService);
 		serviceCollection.set(IWorkspaceTrustEnablementService, workspaceTrustEnablementService);
 
 		const workspaceTrustManagementService = new WorkspaceTrustManagementService(configurationService, remoteAuthorityResolverService, storageService, uriIdentityService, environmentService, configurationService, workspaceTrustEnablementService, fileService);
 		serviceCollection.set(IWorkspaceTrustManagementService, workspaceTrustManagementService);
 
-		// Update workspace trust so that configuration is updated accordingly
+		// 更新工作区信任，以便相应地更新配置
 		configurationService.updateWorkspaceTrust(workspaceTrustManagementService.isWorkspaceTrusted());
 		this._register(workspaceTrustManagementService.onDidChangeTrust(() => configurationService.updateWorkspaceTrust(workspaceTrustManagementService.isWorkspaceTrusted())));
 
 
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		//
-		// NOTE: Please do NOT register services here. Use `registerSingleton()`
-		//       from `workbench.common.main.ts` if the service is shared between
-		//       desktop and web or `workbench.desktop.main.ts` if the service
-		//       is desktop only.
+		// 注意: 请不要在这里注册服务。如果服务在桌面和Web之间共享，
+		//      请使用`workbench.common.main.ts`中的`registerSingleton()`；
+		//      如果服务仅限桌面使用，请使用`workbench.desktop.main.ts`。
 		//
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -343,17 +361,23 @@ export class DesktopMain extends Disposable {
 		return { serviceCollection, logService, storageService, configurationService };
 	}
 
+	/**
+	 * 解析工作区标识符
+	 */
 	private resolveWorkspaceIdentifier(environmentService: INativeWorkbenchEnvironmentService): IAnyWorkspaceIdentifier {
 
-		// Return early for when a folder or multi-root is opened
+		// 当打开文件夹或多根目录时提前返回
 		if (this.configuration.workspace) {
 			return this.configuration.workspace;
 		}
 
-		// Otherwise, workspace is empty, so we derive an identifier
+		// 否则，工作区为空，所以我们派生一个标识符
 		return toWorkspaceIdentifier(this.configuration.backupPath, environmentService.isExtensionDevelopment);
 	}
 
+	/**
+	 * 创建工作区服务
+	 */
 	private async createWorkspaceService(
 		workspace: IAnyWorkspaceIdentifier,
 		environmentService: INativeWorkbenchEnvironmentService,
@@ -365,7 +389,7 @@ export class DesktopMain extends Disposable {
 		logService: ILogService,
 		policyService: IPolicyService
 	): Promise<WorkspaceService> {
-		const configurationCache = new ConfigurationCache([Schemas.file, Schemas.vscodeUserData] /* Cache all non native resources */, environmentService, fileService);
+		const configurationCache = new ConfigurationCache([Schemas.file, Schemas.vscodeUserData] /* 缓存所有非原生资源 */, environmentService, fileService);
 		const workspaceService = new WorkspaceService({ remoteAuthority: environmentService.remoteAuthority, configurationCache }, environmentService, userDataProfileService, userDataProfilesService, fileService, remoteAgentService, uriIdentityService, logService, policyService);
 
 		try {
@@ -379,6 +403,9 @@ export class DesktopMain extends Disposable {
 		}
 	}
 
+	/**
+	 * 创建存储服务
+	 */
 	private async createStorageService(workspace: IAnyWorkspaceIdentifier, environmentService: INativeWorkbenchEnvironmentService, userDataProfileService: IUserDataProfileService, userDataProfilesService: IUserDataProfilesService, mainProcessService: IMainProcessService): Promise<NativeWorkbenchStorageService> {
 		const storageService = new NativeWorkbenchStorageService(workspace, userDataProfileService, userDataProfilesService, mainProcessService, environmentService);
 
@@ -393,6 +420,9 @@ export class DesktopMain extends Disposable {
 		}
 	}
 
+	/**
+	 * 创建键盘布局服务
+	 */
 	private async createKeyboardLayoutService(mainProcessService: IMainProcessService): Promise<NativeKeyboardLayoutService> {
 		const keyboardLayoutService = new NativeKeyboardLayoutService(mainProcessService);
 
@@ -408,10 +438,16 @@ export class DesktopMain extends Disposable {
 	}
 }
 
+/**
+ * 桌面主界面接口
+ */
 export interface IDesktopMain {
 	main(configuration: INativeWindowConfiguration): Promise<void>;
 }
 
+/**
+ * 主函数 - 创建并启动桌面工作台
+ */
 export function main(configuration: INativeWindowConfiguration): Promise<void> {
 	const workbench = new DesktopMain(configuration);
 

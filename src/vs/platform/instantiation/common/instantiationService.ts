@@ -129,12 +129,12 @@ export class InstantiationService implements IInstantiationService {
 				get: <T>(id: ServiceIdentifier<T>) => {
 
 					if (_done) {
-						throw illegalState('service accessor is only valid during the invocation of its target method');
+						throw illegalState('服务访问器仅在其目标方法调用期间有效');
 					}
 
 					const result = this._getOrCreateServiceInstance(id, _trace);
 					if (!result) {
-						throw new Error(`[invokeFunction] unknown service '${id}'`);
+						throw new Error(`[invokeFunction] 无效的服务 '${id}'`);
 					}
 					return result;
 				}
