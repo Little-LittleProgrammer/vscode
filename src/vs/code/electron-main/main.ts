@@ -345,6 +345,7 @@ class CodeMain {
 		let mainProcessNodeIpcServer: NodeIPCServer; // 进程间通信服务
 		try {
 			mark('code/willStartMainServer');
+			// main.ts在启动应用后就创建了一个主进程 main process，它可以通过electron中的一些模块直接与原生GUI交互。
 			mainProcessNodeIpcServer = await nodeIPCServe(environmentMainService.mainIPCHandle); // 创建服务端 ipc 服务（IPC 通常指 Inter-Process Communication，即进程间通信）
 			mark('code/didStartMainServer');
 			Event.once(lifecycleMainService.onWillShutdown)(() => mainProcessNodeIpcServer.dispose());

@@ -556,14 +556,14 @@ export class CodeApplication extends Disposable {
 		}
 
 		// 主进程服务 (基于 electron IPC)
+		// 是主进程和渲染进程之间通信的核心桥梁
 		const mainProcessElectronServer = new ElectronIPCServer();
 		Event.once(this.lifecycleMainService.onWillShutdown)(e => {
 			if (e.reason === ShutdownReason.KILL) {
 				// 当我们异常退出时，确保释放
 				// 我们从其他窗口接受的任何 IPC，以减少
 				// 在我们退出后继续工作的可能性。Kill
-				// 特殊之处在于它不会有序地关闭
-				// 窗口。
+				// 特殊之处在于它不会有序地关闭窗口。
 				mainProcessElectronServer.dispose();
 			}
 		});
@@ -592,7 +592,7 @@ export class CodeApplication extends Disposable {
 		// 瞬态配置文件处理程序
 		this._register(appInstantiationService.createInstance(UserDataProfilesHandler));
 
-		// 初始化通道
+		// 初始化通道, 主进程和渲染进程之间通信的核心桥梁mainProcessElectronServer
 		appInstantiationService.invokeFunction(accessor => this.initChannels(accessor, mainProcessElectronServer, sharedProcessClient));
 
 		// 设置协议 URL 处理程序
@@ -1130,6 +1130,13 @@ export class CodeApplication extends Disposable {
 		// 直到采用 `requestSingleInstance` API。
 
 		const disposables = this._register(new DisposableStore());
+
+		// 通道初始化的主要用途：
+		// 1. 建立主进程与渲染进程之间的通信桥梁
+		// 2. 允许渲染进程访问主进程中的服务和功能
+		// 3. 支持多进程架构下的服务协调和数据共享
+		// 4. 提供安全的跨进程API调用机制
+		// 5. 实现VS Code核心功能的分布式执行
 
 		const launchChannel = ProxyChannel.fromService(accessor.get(ILaunchMainService), disposables, { disableMarshalling: true });
 		this.mainProcessNodeIpcServer.registerChannel('launch', launchChannel);

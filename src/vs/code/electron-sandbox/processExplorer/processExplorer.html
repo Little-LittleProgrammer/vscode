@@ -1,4 +1,14 @@
 <!-- Copyright (C) Microsoft Corporation. All rights reserved. -->
+<!--
+  ProcessExplorer HTML界面
+
+  这是VSCode进程管理器的界面文件，提供了一个简单的HTML结构，
+  用于显示VSCode相关的所有进程信息。UI主要包含一个进程列表，
+  显示进程名称、PID、CPU和内存使用情况等。
+
+  该页面在独立窗口中打开，通过Electron沙盒环境运行，
+  确保安全性的同时能够访问系统进程信息。
+-->
 <!DOCTYPE html>
 <html>
 	<head>
@@ -30,13 +40,15 @@
 					'self'
 				;
 		">
+		<!-- 引入主样式文件 -->
 		<link rel="stylesheet" href="./processExplorerMain.css">
 	</head>
 
 	<body aria-label="">
+		<!-- 进程列表容器 -->
 		<div id="process-list"></div>
 	</body>
 
-	<!-- Startup (do not modify order of script tags!) -->
+	<!-- 启动脚本 (不要修改脚本标签的顺序!) -->
 	<script src="./processExplorer.js" type="module"></script>
 </html>

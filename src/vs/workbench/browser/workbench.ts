@@ -129,6 +129,8 @@ export class Workbench extends Layout {
 			// 服务
 			const instantiationService = this.initServices(this.serviceCollection);
 
+			// 使用服务访问器调用一个函数。
+			// 在服务访问器中，可以获取并使用已注册的服务。
 			instantiationService.invokeFunction(accessor => {
 				const lifecycleService = accessor.get(ILifecycleService);
 				const storageService = accessor.get(IStorageService);

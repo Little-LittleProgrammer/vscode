@@ -3,6 +3,22 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+/**
+ * ProcessExplorer主要实现文件
+ *
+ * 这个文件实现了VSCode的进程管理器功能，包括：
+ * 1. 进程树的数据结构和渲染逻辑
+ * 2. 进程信息的获取和更新机制
+ * 3. 进程管理操作（结束进程、生成内存转储等）
+ * 4. 用户界面交互（右键菜单、快捷键等）
+ *
+ * 主要组件：
+ * - ProcessListDelegate: 定义列表项的高度和模板ID
+ * - ProcessTreeDataSource: 实现树形数据的父子关系
+ * - 各种Renderer: 负责不同类型节点的渲染
+ * - ProcessExplorer类: 核心功能实现，包括数据更新、UI交互等
+ */
+
 import './media/processExplorer.css';
 import '../../../base/browser/ui/codicons/codiconStyles.js'; // make sure codicon css is loaded
 import { localize } from '../../../nls.js';

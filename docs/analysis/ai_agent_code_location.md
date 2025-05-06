@@ -28,3 +28,14 @@ VS Code 中与 AI Agent 相关的功能（例如 Copilot、GitHub Copilot Chat�
 *   **编辑器内交互的底层实现**：部分在 `src/vs/editor/contrib/` 下，特别是 `inlineCompletions`。
 *   **核心服务和状态管理**：在 `src/vs/workbench/services/` 下对应的服务目录中。
 *   **底层抽象和平台支持**：散布在 `src/vs/platform/` 下，提供通用能力。
+
+```journey
+    title My working day
+    section Go to work
+      Make tea: 5: Me
+      Go upstairs: 3: Me
+      Do work: 1: Me, Cat
+    section Go home
+      Go downstairs: 5: Me
+      Sit down: 5: Me
+```

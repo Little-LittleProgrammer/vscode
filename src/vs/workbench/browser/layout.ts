@@ -1600,20 +1600,20 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
 	layout(): void {
 		if (!this.disposed) {
 			this._mainContainerDimension = getClientArea(this.state.runtime.mainWindowFullscreen ?
-				mainWindow.document.body : 	// in fullscreen mode, make sure to use <body> element because
-				this.parent,				// in that case the workbench will span the entire site
-				DEFAULT_WINDOW_DIMENSIONS	// running with fallback to ensure no error is thrown (https://github.com/microsoft/vscode/issues/240242)
+				mainWindow.document.body : 	// 在全屏模式下，确保使用<body>元素，因为
+				this.parent,				// 在这种情况下，工作台将跨越整个站点
+				DEFAULT_WINDOW_DIMENSIONS	// 使用回退运行以确保不会抛出错误 (https://github.com/microsoft/vscode/issues/240242)
 			);
 			this.logService.trace(`Layout#layout, height: ${this._mainContainerDimension.height}, width: ${this._mainContainerDimension.width}`);
 
 			position(this.mainContainer, 0, 0, 0, 0, 'relative');
 			size(this.mainContainer, this._mainContainerDimension.width, this._mainContainerDimension.height);
 
-			// Layout the grid widget
+			// 布局网格小部件
 			this.workbenchGrid.layout(this._mainContainerDimension.width, this._mainContainerDimension.height);
 			this.initialized = true;
 
-			// Emit as event
+			// 作为事件发出
 			this.handleContainerDidLayout(this.mainContainer, this._mainContainerDimension);
 		}
 	}
