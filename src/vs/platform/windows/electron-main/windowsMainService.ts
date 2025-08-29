@@ -321,7 +321,7 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 	 * @returns 打开的窗口数组
 	 */
 	async open(openConfig: IOpenConfiguration): Promise<ICodeWindow[]> {
-		this.logService.trace('windowsManager#open'); // 跟踪打开窗口
+		this.logService.info('windowsManager#open', openConfig); // 跟踪打开窗口
 
 		// 确保 addMode/removeMode 仅在我们有活动窗口时启用
 		// 如果初始启动或没有活动窗口，则禁用
@@ -411,7 +411,7 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 		// 根据配置打开
 		const { windows: usedWindows, filesOpenedInWindow } = await this.doOpen(openConfig, workspacesToOpen, foldersToOpen, emptyWindowsWithBackupsToRestore, maybeOpenEmptyWindow, filesToOpen, foldersToAdd, foldersToRemove);
 
-		this.logService.trace(`windowsManager#open used window count ${usedWindows.length} (workspacesToOpen: ${workspacesToOpen.length}, foldersToOpen: ${foldersToOpen.length}, emptyToRestore: ${emptyWindowsWithBackupsToRestore.length}, maybeOpenEmptyWindow: ${maybeOpenEmptyWindow})`);
+		this.logService.info(`windowsManager#open used window count ${usedWindows.length} (workspacesToOpen: ${workspacesToOpen.length}, foldersToOpen: ${foldersToOpen.length}, emptyToRestore: ${emptyWindowsWithBackupsToRestore.length}, maybeOpenEmptyWindow: ${maybeOpenEmptyWindow})`);
 
 		// 如果我们打开多个窗口，确保将焦点传递给最相关的窗口
 		if (usedWindows.length > 1) {
@@ -1700,6 +1700,7 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 
 			// 创建窗口
 			mark('code/willCreateCodeWindow');
+			// 主进程中创建窗口的实例，这个实例会负责启动一个关联的渲染进程，里面包含(窗口Id， services， 窗口配置等等)
 			const createdWindow = window = this.instantiationService.createInstance(CodeWindow, {
 				state,
 				extensionDevelopmentPath: configuration.extensionDevelopmentPath,
@@ -1724,18 +1725,18 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 
 			// 窗口事件窗口监听器
 			const disposables = new DisposableStore();
-			disposables.add(createdWindow.onDidSignalReady(() => this._onDidSignalReadyWindow.fire(createdWindow)));
-			disposables.add(Event.once(createdWindow.onDidClose)(() => this.onWindowClosed(createdWindow, disposables)));
-			disposables.add(Event.once(createdWindow.onDidDestroy)(() => this.onWindowDestroyed(createdWindow)));
-			disposables.add(createdWindow.onDidMaximize(() => this._onDidMaximizeWindow.fire(createdWindow)));
-			disposables.add(createdWindow.onDidUnmaximize(() => this._onDidUnmaximizeWindow.fire(createdWindow)));
-			disposables.add(createdWindow.onDidEnterFullScreen(() => this._onDidChangeFullScreen.fire({ window: createdWindow, fullscreen: true })));
-			disposables.add(createdWindow.onDidLeaveFullScreen(() => this._onDidChangeFullScreen.fire({ window: createdWindow, fullscreen: false })));
+			disposables.add(createdWindow.onDidSignalReady(() => this._onDidSignalReadyWindow.fire(createdWindow))); // 窗口准备就绪事件：当窗口加载完成并准备接收消息时触发
+			disposables.add(Event.once(createdWindow.onDidClose)(() => this.onWindowClosed(createdWindow, disposables))); // 窗口关闭事件：当窗口关闭时，调用 onWindowClosed 方法进行清理工作
+			disposables.add(Event.once(createdWindow.onDidDestroy)(() => this.onWindowDestroyed(createdWindow))); // 窗口销毁事件：当窗口被彻底销毁时，调用 onWindowDestroyed 方法进行最终清理
+			disposables.add(createdWindow.onDidMaximize(() => this._onDidMaximizeWindow.fire(createdWindow))); // 窗口最大化事件：当窗口被最大化时触发
+			disposables.add(createdWindow.onDidUnmaximize(() => this._onDidUnmaximizeWindow.fire(createdWindow))); // 窗口取消最大化事件：当窗口从最大化状态恢复时触
+			disposables.add(createdWindow.onDidEnterFullScreen(() => this._onDidChangeFullScreen.fire({ window: createdWindow, fullscreen: true }))); // 窗口进入全屏事件：当窗口进入全屏模式时触发
+			disposables.add(createdWindow.onDidLeaveFullScreen(() => this._onDidChangeFullScreen.fire({ window: createdWindow, fullscreen: false }))); // 窗口退出全屏事件：当窗口退出全屏模式时触发
 			disposables.add(createdWindow.onDidTriggerSystemContextMenu(({ x, y }) => this._onDidTriggerSystemContextMenu.fire({ window: createdWindow, x, y })));
 
 			const webContents = assertIsDefined(createdWindow.win?.webContents);
 			webContents.removeAllListeners('devtools-reload-page'); // 移除内置侦听器，以便我们可以自己处理
-			disposables.add(Event.fromNodeEventEmitter(webContents, 'devtools-reload-page')(() => this.lifecycleMainService.reload(createdWindow)));
+			disposables.add(Event.fromNodeEventEmitter(webContents, 'devtools-reload-page')(() => this.lifecycleMainService.reload(createdWindow))); // 重新注册 'devtools-reload-page' 事件监听器，使用 VSCode 的事件系统
 
 			// 5.注册窗口生命周期
 			this.lifecycleMainService.registerWindow(createdWindow);

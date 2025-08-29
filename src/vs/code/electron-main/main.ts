@@ -119,7 +119,7 @@ class CodeMain {
 		const [instantiationService, instanceEnvironment, environmentMainService, configurationService, stateMainService, bufferLogger, productService, userDataProfilesMainService] = this.createServices();
 
 		try {
-
+			console.log('main.ts: startup');
 			// 初始化服务
 			try {
 				await this.initServices(environmentMainService, userDataProfilesMainService, configurationService, stateMainService, productService);

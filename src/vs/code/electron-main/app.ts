@@ -126,6 +126,7 @@ import ErrorTelemetry from '../../platform/telemetry/electron-main/errorTelemetr
 /**
  * 主要的 VS Code 应用程序。只会存在一个实例，
  * 即使用户启动了多个实例（例如从命令行）。
+ * 初始化了所有核心服务并设置了必要的事件监听器
  */
 export class CodeApplication extends Disposable {
 
@@ -592,7 +593,7 @@ export class CodeApplication extends Disposable {
 		// 瞬态配置文件处理程序
 		this._register(appInstantiationService.createInstance(UserDataProfilesHandler));
 
-		// 初始化通道, 主进程和渲染进程之间通信的核心桥梁mainProcessElectronServer
+		// 初始化通道, 主进程中建立与各个进程之间的通道 mainProcessNodeIpcServer.registerChannel
 		appInstantiationService.invokeFunction(accessor => this.initChannels(accessor, mainProcessElectronServer, sharedProcessClient));
 
 		// 设置协议 URL 处理程序
@@ -867,6 +868,9 @@ export class CodeApplication extends Disposable {
 		return undefined;
 	}
 
+	/**
+	 * 负责处理通过 VS Code 协议（如 vscode:// 或 code://）传入的 URL 请求
+	 */
 	private async handleProtocolUrl(windowsMainService: IWindowsMainService, dialogMainService: IDialogMainService, urlService: IURLService, uri: URI, options?: IOpenURLOptions): Promise<boolean> {
 		this.logService.trace('app#handleProtocolUrl():', uri.toString(true), options);
 
@@ -1122,6 +1126,18 @@ export class CodeApplication extends Disposable {
 		return this.mainInstantiationService.createChild(services);
 	}
 
+	/**
+	 * 主进程中建立与各个进程之间的通道 mainProcessNodeIpcServer.registerChannel，让其他进程可以调用主进程中的这些功能
+	 *
+	 * 1. 建立主进程与渲染进程之间的通信桥梁，允许渲染进程访问主进程中的服务和功能
+	 * 2. 建立主进程与共享进程之间的通信桥梁（扩展），允许共享进程访问主进程中的服务和功能
+	 * 3. 支持多进程架构下的服务协调和数据共享
+	 * 4. 提供安全的跨进程API调用机制
+	 * 5. 实现VS Code核心功能的分布式执行
+	 * @param accessor
+	 * @param mainProcessElectronServer
+	 * @param sharedProcessClient
+	 */
 	private initChannels(accessor: ServicesAccessor, mainProcessElectronServer: ElectronIPCServer, sharedProcessClient: Promise<MessagePortClient>): void {
 
 		// 注册到 node.js 的通道会暴露给第二个实例
@@ -1130,13 +1146,6 @@ export class CodeApplication extends Disposable {
 		// 直到采用 `requestSingleInstance` API。
 
 		const disposables = this._register(new DisposableStore());
-
-		// 通道初始化的主要用途：
-		// 1. 建立主进程与渲染进程之间的通信桥梁
-		// 2. 允许渲染进程访问主进程中的服务和功能
-		// 3. 支持多进程架构下的服务协调和数据共享
-		// 4. 提供安全的跨进程API调用机制
-		// 5. 实现VS Code核心功能的分布式执行
 
 		const launchChannel = ProxyChannel.fromService(accessor.get(ILaunchMainService), disposables, { disableMarshalling: true });
 		this.mainProcessNodeIpcServer.registerChannel('launch', launchChannel);
@@ -1161,7 +1170,7 @@ export class CodeApplication extends Disposable {
 		mainProcessElectronServer.registerChannel('userDataProfiles', userDataProfilesService);
 		sharedProcessClient.then(client => client.registerChannel('userDataProfiles', userDataProfilesService));
 
-		// 更新
+		// 更新，处理应用程序更新相关通信
 		const updateChannel = new UpdateChannel(accessor.get(IUpdateService));
 		mainProcessElectronServer.registerChannel('update', updateChannel);
 
@@ -1216,7 +1225,7 @@ export class CodeApplication extends Disposable {
 		const profileStorageListener = disposables.add((new ProfileStorageChangesListenerChannel(accessor.get(IStorageMainService), accessor.get(IUserDataProfilesMainService), this.logService)));
 		sharedProcessClient.then(client => client.registerChannel('profileStorageListener', profileStorageListener));
 
-		// 终端
+		// 终端，通道处理终端相关通信
 		const ptyHostChannel = ProxyChannel.fromService(accessor.get(ILocalPtyService), disposables);
 		mainProcessElectronServer.registerChannel(TerminalIpcChannels.LocalPty, ptyHostChannel);
 
@@ -1237,7 +1246,7 @@ export class CodeApplication extends Disposable {
 		const electronExtensionHostDebugBroadcastChannel = new ElectronExtensionHostDebugBroadcastChannel(accessor.get(IWindowsMainService));
 		mainProcessElectronServer.registerChannel('extensionhostdebugservice', electronExtensionHostDebugBroadcastChannel);
 
-		// 扩展主机启动器
+		// 扩展主机启动器， 通道管理扩展主机·
 		const extensionHostStarterChannel = ProxyChannel.fromService(accessor.get(IExtensionHostStarter), disposables);
 		mainProcessElectronServer.registerChannel(ipcExtensionHostStarterChannelName, extensionHostStarterChannel);
 

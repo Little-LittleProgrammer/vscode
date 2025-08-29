@@ -306,9 +306,12 @@ export class Workbench extends Layout {
 		}
 	}
 
+	/**
+	 * 渲染工作台
+	 */
 	private renderWorkbench(instantiationService: IInstantiationService, notificationService: NotificationService, storageService: IStorageService, configurationService: IConfigurationService): void {
 
-		// ARIA和信号
+		// 无障碍访问 ARIA（Accessible Rich Internet Applications）和可访问性信号
 		setARIAContainer(this.mainContainer);
 		setProgressAcccessibilitySignalScheduler((msDelayTime: number, msLoopTime?: number) => instantiationService.createInstance(AccessibilityProgressSignalScheduler, msDelayTime, msLoopTime));
 

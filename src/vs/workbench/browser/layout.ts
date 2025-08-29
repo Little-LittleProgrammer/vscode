@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *  版权所有 (c) 微软公司。保留所有权利。
+ *  基于 MIT 许可协议授权。有关许可信息请参阅项目根目录下的 License.txt 文件。
  *--------------------------------------------------------------------------------------------*/
 
 import { Disposable, DisposableMap, DisposableStore, IDisposable, toDisposable } from '../../base/common/lifecycle.js';
@@ -49,7 +49,7 @@ import { ITelemetryService } from '../../platform/telemetry/common/telemetry.js'
 import { IAuxiliaryWindowService } from '../services/auxiliaryWindow/browser/auxiliaryWindowService.js';
 import { CodeWindow, mainWindow } from '../../base/browser/window.js';
 
-//#region Layout Implementation
+//#region 布局实现
 
 interface ILayoutRuntimeState {
 	activeContainerId: number;
@@ -304,59 +304,59 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
 
 	protected initLayout(accessor: ServicesAccessor): void {
 
-		// Services
-		this.environmentService = accessor.get(IBrowserWorkbenchEnvironmentService);
-		this.configurationService = accessor.get(IConfigurationService);
-		this.hostService = accessor.get(IHostService);
-		this.contextService = accessor.get(IWorkspaceContextService);
-		this.storageService = accessor.get(IStorageService);
-		this.workingCopyBackupService = accessor.get(IWorkingCopyBackupService);
-		this.themeService = accessor.get(IThemeService);
-		this.extensionService = accessor.get(IExtensionService);
-		this.logService = accessor.get(ILogService);
-		this.telemetryService = accessor.get(ITelemetryService);
-		this.auxiliaryWindowService = accessor.get(IAuxiliaryWindowService);
+		// 服务
+		this.environmentService = accessor.get(IBrowserWorkbenchEnvironmentService); // 环境服务：提供当前运行环境信息，如URL、命令行参数、特性标志等
+		this.configurationService = accessor.get(IConfigurationService); // 配置服务：管理用户设置、工作区设置和默认设置的读取和更新
+		this.hostService = accessor.get(IHostService); // 主机服务：提供窗口操作、焦点管理、窗口状态控制等功能
+		this.contextService = accessor.get(IWorkspaceContextService); // 工作区上下文服务：管理当前工作区信息、文件夹、工作区类型等
+		this.storageService = accessor.get(IStorageService); // 存储服务：提供持久化存储功能，保存用户数据、状态信息等
+		this.workingCopyBackupService = accessor.get(IWorkingCopyBackupService); // 工作副本备份服务：管理未保存文件的自动备份和恢复
+		this.themeService = accessor.get(IThemeService); // 主题服务：管理颜色主题、图标主题的切换和应用
+		this.extensionService = accessor.get(IExtensionService); // 扩展服务：管理扩展的加载、激活、禁用等生命周期
+		this.logService = accessor.get(ILogService); // 日志服务：提供统一的日志记录功能，支持不同级别的日志输出
+		this.telemetryService = accessor.get(ITelemetryService); // 遥测服务：收集使用情况统计数据和错误报告
+		this.auxiliaryWindowService = accessor.get(IAuxiliaryWindowService); // 辅助窗口服务：管理额外的编辑器窗口创建和操作
 
-		// Parts
-		this.editorService = accessor.get(IEditorService);
-		this.mainPartEditorService = this.editorService.createScoped('main', this._store);
-		this.editorGroupService = accessor.get(IEditorGroupsService);
-		this.paneCompositeService = accessor.get(IPaneCompositePartService);
-		this.viewDescriptorService = accessor.get(IViewDescriptorService);
-		this.titleService = accessor.get(ITitleService);
-		this.notificationService = accessor.get(INotificationService);
-		this.statusBarService = accessor.get(IStatusbarService);
+		// 部件
+		this.editorService = accessor.get(IEditorService); // 编辑器服务：管理编辑器的打开、关闭、切换等核心功能
+		this.mainPartEditorService = this.editorService.createScoped('main', this._store); // 主部分编辑器服务：创建作用域限定在主工作区的编辑器服务实例
+		this.editorGroupService = accessor.get(IEditorGroupsService); // 编辑器组服务：管理编辑器分组、拆分、合并等布局功能
+		this.paneCompositeService = accessor.get(IPaneCompositePartService); // 面板复合服务：管理侧边栏和面板中的视图容器和视图
+		this.viewDescriptorService = accessor.get(IViewDescriptorService); // 视图描述符服务：管理所有视图的注册、显示、隐藏等元数据
+		this.titleService = accessor.get(ITitleService); // 标题服务：管理窗口标题栏的显示内容和行为
+		this.notificationService = accessor.get(INotificationService); // 通知服务：管理弹出通知、消息提示的显示和交互
+		this.statusBarService = accessor.get(IStatusbarService); // 状态栏服务：管理底部状态栏中各项信息的显示和更新
 		accessor.get(IBannerService);
 
-		// Listeners
+		// 监听器
 		this.registerLayoutListeners();
 
-		// State
+		// 状态
 		this.initLayoutState(accessor.get(ILifecycleService), accessor.get(IFileService));
 	}
 
 	private registerLayoutListeners(): void {
 
-		// Restore editor if hidden
+		// 如果编辑器隐藏则恢复
 		const showEditorIfHidden = () => {
 			if (!this.isVisible(Parts.EDITOR_PART, mainWindow)) {
 				this.toggleMaximizedPanel();
 			}
 		};
 
-		// Wait to register these listeners after the editor group service
-		// is ready to avoid conflicts on startup
+		// 等待编辑器组服务准备就绪后再注册这些监听器
+		// 以避免启动时的冲突
 		this.editorGroupService.whenRestored.then(() => {
 
-			// Restore main editor part on any editor change in main part
+			// 在主部分的任何编辑器变更时恢复主编辑器部分
 			this._register(this.mainPartEditorService.onDidVisibleEditorsChange(showEditorIfHidden));
 			this._register(this.editorGroupService.mainPart.onDidActivateGroup(showEditorIfHidden));
 
-			// Revalidate center layout when active editor changes: diff editor quits centered mode.
+			// 当活动编辑器变更时重新验证中心布局：差异编辑器会退出居中模式
 			this._register(this.mainPartEditorService.onDidActiveEditorChange(() => this.centerMainEditorLayout(this.stateModel.getRuntimeValue(LayoutStateKeys.MAIN_EDITOR_CENTERED))));
 		});
 
-		// Configuration changes
+		// 配置变更
 		this._register(this.configurationService.onDidChangeConfiguration((e) => {
 			if ([
 				...TITLE_BAR_SETTINGS,
@@ -364,12 +364,12 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
 				LegacyWorkbenchLayoutSettings.STATUSBAR_VISIBLE,
 			].some(setting => e.affectsConfiguration(setting))) {
 
-				// Show Command Center if command center actions enabled
+				// 如果命令中心操作已启用，则显示命令中心
 				const shareEnabled = e.affectsConfiguration('workbench.experimental.share.enabled') && this.configurationService.getValue<boolean>('workbench.experimental.share.enabled');
 				const navigationControlEnabled = e.affectsConfiguration('workbench.navigationControl.enabled') && this.configurationService.getValue<boolean>('workbench.navigationControl.enabled');
 
-				// Currently not supported for "chat.commandCenter.enabled" as we
-				// programatically set this during setup and could lead to unwanted titlebar appearing
+				// 当前不支持 "chat.commandCenter.enabled"，因为我们
+				// 在设置过程中以编程方式设置它，可能会导致不需要的标题栏出现
 				// const chatControlsEnabled = e.affectsConfiguration('chat.commandCenter.enabled') && this.configurationService.getValue<boolean>('chat.commandCenter.enabled');
 
 				if (shareEnabled || navigationControlEnabled) {
@@ -379,7 +379,7 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
 					}
 				}
 
-				// Show Custom TitleBar if actions enabled in (or moved to) the titlebar
+				// 如果操作在标题栏中启用（或移动到标题栏），则显示自定义标题栏
 				const editorActionsMovedToTitlebar = e.affectsConfiguration(LayoutSettings.EDITOR_ACTIONS_LOCATION) && this.configurationService.getValue<EditorActionsLocation>(LayoutSettings.EDITOR_ACTIONS_LOCATION) === EditorActionsLocation.TITLEBAR;
 				const commandCenterEnabled = e.affectsConfiguration(LayoutSettings.COMMAND_CENTER) && this.configurationService.getValue<boolean>(LayoutSettings.COMMAND_CENTER);
 				const layoutControlsEnabled = e.affectsConfiguration(LayoutSettings.LAYOUT_ACTIONS) && this.configurationService.getValue<boolean>(LayoutSettings.LAYOUT_ACTIONS);
@@ -396,36 +396,36 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
 			}
 		}));
 
-		// Fullscreen changes
+		// 全屏变更
 		this._register(onDidChangeFullscreen(windowId => this.onFullscreenChanged(windowId)));
 
-		// Group changes
+		// 组变更
 		this._register(this.editorGroupService.mainPart.onDidAddGroup(() => this.centerMainEditorLayout(this.stateModel.getRuntimeValue(LayoutStateKeys.MAIN_EDITOR_CENTERED))));
 		this._register(this.editorGroupService.mainPart.onDidRemoveGroup(() => this.centerMainEditorLayout(this.stateModel.getRuntimeValue(LayoutStateKeys.MAIN_EDITOR_CENTERED))));
 		this._register(this.editorGroupService.mainPart.onDidChangeGroupMaximized(() => this.centerMainEditorLayout(this.stateModel.getRuntimeValue(LayoutStateKeys.MAIN_EDITOR_CENTERED))));
 
-		// Prevent workbench from scrolling #55456
+		// 防止工作台滚动 #55456
 		this._register(addDisposableListener(this.mainContainer, EventType.SCROLL, () => this.mainContainer.scrollTop = 0));
 
-		// Menubar visibility changes
+		// 菜单栏可见性变更
 		const showingCustomMenu = (isWindows || isLinux || isWeb) && !hasNativeTitlebar(this.configurationService);
 		if (showingCustomMenu) {
 			this._register(this.titleService.onMenubarVisibilityChange(visible => this.onMenubarToggled(visible)));
 		}
 
-		// Theme changes
+		// 主题变更
 		this._register(this.themeService.onDidColorThemeChange(() => this.updateWindowsBorder()));
 
-		// Window active / focus changes
+		// 窗口活动/焦点变更
 		this._register(this.hostService.onDidChangeFocus(focused => this.onWindowFocusChanged(focused)));
 		this._register(this.hostService.onDidChangeActiveWindow(() => this.onActiveWindowChanged()));
 
-		// WCO changes
+		// WCO（窗口控件叠加层）变更
 		if (isWeb && typeof (navigator as any).windowControlsOverlay === 'object') {
 			this._register(addDisposableListener((navigator as any).windowControlsOverlay, 'geometrychange', () => this.onDidChangeWCO()));
 		}
 
-		// Auxiliary windows
+		// 辅助窗口
 		this._register(this.auxiliaryWindowService.onDidOpenAuxiliaryWindow(({ window, disposables }) => {
 			const windowId = window.window.vscodeWindowId;
 			this.containerStylesLoaded.set(windowId, window.whenStylesHaveLoaded);
@@ -763,10 +763,10 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
 
 	private shouldRestoreEditors(contextService: IWorkspaceContextService, initialEditorsState: IInitialEditorsState | undefined): boolean {
 
-		// Restore editors based on a set of rules:
-		// - never when running on temporary workspace
-		// - not when we have files to open, unless:
-		// - always when `window.restoreWindows: preserve`
+		// 根据一组规则恢复编辑器：
+		// - 在临时工作区上运行时从不恢复
+		// - 当有要打开的文件时不恢复，除非：
+		// - 当 `window.restoreWindows: preserve` 时始终恢复
 
 		if (isTemporaryWorkspace(contextService.getWorkspace())) {
 			return false;
@@ -783,7 +783,7 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
 	private async resolveEditorsToOpen(fileService: IFileService, initialEditorsState: IInitialEditorsState | undefined): Promise<IEditorToOpen[]> {
 		if (initialEditorsState) {
 
-			// Merge editor (single)
+			// 合并编辑器（单个）
 			const filesToMerge = coalesce(await pathsToEditors(initialEditorsState.filesToMerge, fileService, this.logService));
 			if (filesToMerge.length === 4 && isResourceEditorInput(filesToMerge[0]) && isResourceEditorInput(filesToMerge[1]) && isResourceEditorInput(filesToMerge[2]) && isResourceEditorInput(filesToMerge[3])) {
 				return [{
@@ -797,7 +797,7 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
 				}];
 			}
 
-			// Diff editor (single)
+			// 差异编辑器（单个）
 			const filesToDiff = coalesce(await pathsToEditors(initialEditorsState.filesToDiff, fileService, this.logService));
 			if (filesToDiff.length === 2) {
 				return [{
@@ -809,7 +809,7 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
 				}];
 			}
 
-			// Normal editor (multiple)
+			// 普通编辑器（多个）
 			const filesToOpenOrCreate: IEditorToOpen[] = [];
 			const resolvedFilesToOpenOrCreate = await pathsToEditors(initialEditorsState.filesToOpenOrCreate, fileService, this.logService);
 			for (let i = 0; i < resolvedFilesToOpenOrCreate.length; i++) {
@@ -889,33 +889,30 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
 
 	protected restoreParts(): void {
 
-		// distinguish long running restore operations that
-		// are required for the layout to be ready from those
-		// that are needed to signal restoring is done
+		// 区分长时间运行的恢复操作：
+		// 一类是布局准备就绪所需的操作
+		// 另一类是用来发出恢复完成信号的操作
 		const layoutReadyPromises: Promise<unknown>[] = [];
 		const layoutRestoredPromises: Promise<unknown>[] = [];
 
-		// Restore editors
+		// 恢复编辑器
 		layoutReadyPromises.push((async () => {
 			mark('code/willRestoreEditors');
 
-			// first ensure the editor part is ready
+			// 首先确保编辑器部分准备就绪
 			await this.editorGroupService.whenReady;
 			mark('code/restoreEditors/editorGroupsReady');
 
-			// apply editor layout if any
+			// 应用编辑器布局（如果有的话）
 			if (this.state.initialization.layout?.editors) {
 				this.editorGroupService.mainPart.applyLayout(this.state.initialization.layout.editors);
 			}
 
-			// then see for editors to open as instructed
-			// it is important that we trigger this from
-			// the overall restore flow to reduce possible
-			// flicker on startup: we want any editor to
-			// open to get a chance to open first before
-			// signaling that layout is restored, but we do
-			// not need to await the editors from having
-			// fully loaded.
+			// 然后查看要按指示打开的编辑器
+			// 重要的是我们从总体恢复流程中触发这个操作
+			// 以减少启动时可能的闪烁：我们希望任何编辑器
+			// 在发出布局已恢复的信号之前先有机会打开，
+			// 但我们不需要等待编辑器完全加载完成。
 
 			const editors = await this.state.initialization.editor.editorsToOpen;
 			mark('code/restoreEditors/editorsToOpenResolved');
@@ -923,15 +920,14 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
 			let openEditorsPromise: Promise<unknown> | undefined = undefined;
 			if (editors.length) {
 
-				// we have to map editors to their groups as instructed
-				// by the input. this is important to ensure that we open
-				// the editors in the groups they belong to.
+				// 我们必须按照输入的指示将编辑器映射到它们的分组
+				// 这一点很重要，可以确保我们在正确的分组中打开编辑器
 
 				const editorGroupsInVisualOrder = this.editorGroupService.mainPart.getGroups(GroupsOrder.GRID_APPEARANCE);
 				const mapEditorsToGroup = new Map<GroupIdentifier, Set<IUntypedEditorInput>>();
 
 				for (const editor of editors) {
-					const group = editorGroupsInVisualOrder[(editor.viewColumn ?? 1) - 1]; // viewColumn is index+1 based
+					const group = editorGroupsInVisualOrder[(editor.viewColumn ?? 1) - 1]; // viewColumn 是基于索引+1 的
 
 					let editorsByGroup = mapEditorsToGroup.get(group.id);
 					if (!editorsByGroup) {
@@ -2482,14 +2478,14 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
 
 		type StartupLayoutEventClassification = {
 			owner: 'benibenj';
-			comment: 'Information about the layout of the workbench during statup';
-			activityBarVisible: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: 'Whether or the not the activity bar is visible' };
-			sideBarVisible: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: 'Whether or the not the primary side bar is visible' };
-			auxiliaryBarVisible: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: 'Whether or the not the secondary side bar is visible' };
-			panelVisible: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: 'Whether or the not the panel is visible' };
-			statusbarVisible: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: 'Whether or the not the status bar is visible' };
-			sideBarPosition: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: 'Whether the primary side bar is on the left or right' };
-			panelPosition: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: 'Whether the panel is on the top, bottom, left, or right' };
+			comment: '关于工作台启动期间布局的信息';
+			activityBarVisible: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: '活动栏是否可见' };
+			sideBarVisible: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: '主侧边栏是否可见' };
+			auxiliaryBarVisible: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: '辅助侧边栏是否可见' };
+			panelVisible: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: '面板是否可见' };
+			statusbarVisible: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: '状态栏是否可见' };
+			sideBarPosition: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: '主侧边栏是在左侧还是右侧' };
+			panelPosition: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: '面板是在顶部、底部、左侧还是右侧' };
 		};
 
 		const layoutDescriptor: StartupLayoutEvent = {
@@ -2531,7 +2527,7 @@ function getZenModeConfiguration(configurationService: IConfigurationService): Z
 
 //#endregion
 
-//#region Layout State Model
+//#region 布局状态模型
 
 interface IWorkbenchLayoutStateKey {
 	readonly name: string;

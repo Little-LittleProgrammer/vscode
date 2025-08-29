@@ -222,6 +222,7 @@ export class DesktopMain extends Disposable {
 		if (isCI) {
 			logService.info('workbench#open()'); // 标记工作台打开有助于诊断不稳定的集成/冒烟测试
 		}
+		// 在调用 trace 前先判断级别，避免不必要的 safeStringify 序列化开销
 		if (logService.getLevel() === LogLevel.Trace) {
 			logService.trace('workbench#open(): with configuration', safeStringify({ ...this.configuration, nls: undefined /* 排除大型属性 */ }));
 		}

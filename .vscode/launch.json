@@ -626,7 +626,11 @@
 			"presentation": {
 				"group": "0_vscode",
 				"order": 1
-			}
+			},
+			"args": [
+				"--disable-extensions",
+				"--log=trace"
+			],
 		},
 		{
 			"name": "Search, Renderer, and Main processes",

@@ -51,7 +51,7 @@
 	}
 
 	async function resolveWindowConfiguration<T extends ISandboxConfiguration>() {
-		const timeout = setTimeout(() => { console.error(`[resolve window config] Could not resolve window configuration within 10 seconds, but will continue to wait...`); }, 10000);
+		const timeout = setTimeout(() => { console.error(`[解析窗口配置] 无法在10秒内解析窗口配置，但将继续等待...`); }, 10000);
 		performance.mark('code/willWaitForWindowConfig');
 
 		const configuration = await preloadGlobals.context.resolveConfiguration() as T;

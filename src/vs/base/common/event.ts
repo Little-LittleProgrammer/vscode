@@ -999,16 +999,16 @@ const forEachListener = <T>(listeners: ListenerOrListeners<T>, fn: (c: ListenerC
 };
 
 /**
- * The Emitter can be used to expose an Event to the public
- * to fire it from the insides.
- * Sample:
+ * Emitter可以用于向公众暴露一个Event，
+ * 并从内部触发它。
+ * 示例:
 	class Document {
 
 		private readonly _onDidChange = new Emitter<(value:string)=>any>();
 
 		public onDidChange = this._onDidChange.event;
 
-		// getter-style
+		// getter风格
 		// get onDidChange(): Event<(value:string)=>any> {
 		// 	return this._onDidChange.event;
 		// }
@@ -1092,8 +1092,8 @@ export class Emitter<T> {
 	}
 
 	/**
-	 * For the public to allow to subscribe
-	 * to events from this Emitter
+	 * 用于公开订阅
+	 * 来自此发射器的事件
 	 */
 	get event(): Event<T> {
 		this._event ??= (callback: (e: T) => unknown, thisArgs?: any, disposables?: IDisposable[] | DisposableStore) => {

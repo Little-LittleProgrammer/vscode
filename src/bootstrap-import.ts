@@ -1,12 +1,12 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *  版权所有 (c) Microsoft Corporation。保留所有权利。
+ *  根据 MIT 许可证授权。有关许可证信息，请参见项目根目录中的 License.txt。
  *--------------------------------------------------------------------------------------------*/
 
 // *********************************************************************
 // *                                                                   *
-// *  We need this to redirect to node_modules from the remote-folder. *
-// *  This ONLY applies  when running out of source.                   *
+// *  我们需要这个文件来重定向到远程文件夹中的 node_modules。          *
+// *  这仅在从源代码运行时适用。                                        *
 // *                                                                   *
 // *********************************************************************
 
@@ -14,12 +14,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promises } from 'node:fs';
 import { join } from 'node:path';
 
-// SEE https://nodejs.org/docs/latest/api/module.html#initialize
+// 参见 https://nodejs.org/docs/latest/api/module.html#initialize
 
 const _specifierToUrl: Record<string, string> = {};
 
 export async function initialize(injectPath: string): Promise<void> {
-	// populate mappings
+	// 填充映射
 
 	const injectPackageJSONPath = fileURLToPath(new URL('../package.json', pathToFileURL(injectPath)));
 	const packageJSON = JSON.parse(String(await promises.readFile(injectPackageJSONPath)));
@@ -44,7 +44,7 @@ export async function initialize(injectPath: string): Promise<void> {
 		}
 	}
 
-	console.log(`[bootstrap-import] Initialized node_modules redirector for: ${injectPath}`);
+	console.log(`[bootstrap-import] 已为以下路径初始化 node_modules 重定向器: ${injectPath}`);
 }
 
 export async function resolve(specifier: string | number, context: any, nextResolve: (arg0: any, arg1: any) => any) {
@@ -58,7 +58,6 @@ export async function resolve(specifier: string | number, context: any, nextReso
 		};
 	}
 
-	// Defer to the next hook in the chain, which would be the
-	// Node.js default resolve if this is the last user-specified loader.
+	// 延迟到链中的下一个钩子，如果这是最后一个用户指定的加载器，那将是 Node.js 默认的解析器。
 	return nextResolve(specifier, context);
 }

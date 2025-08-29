@@ -491,6 +491,11 @@ export class DisposableStore implements IDisposable {
 /**
  * Abstract base class for a {@link IDisposable disposable} object.
  *
+ * Disposable 是 VS Code 中用于资源管理的抽象基类，实现了 IDisposable 接口。
+ * 主要功能和特点：
+ * 资源管理：提供了一种标准的资源释放机制，防止内存泄漏
+ * 自动清理：当对象被处理完后自动清理已注册的资源
+ * 子类扩展：子类通过 _register() 方法注册需要自动释放的资源
  * Subclasses can {@linkcode _register} disposables that will be automatically cleaned up when this object is disposed of.
  */
 export abstract class Disposable implements IDisposable {
