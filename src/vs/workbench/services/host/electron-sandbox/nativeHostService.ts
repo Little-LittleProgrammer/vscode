@@ -211,6 +211,20 @@ class WorkbenchHostService extends Disposable implements IHostService {
 
 	//#endregion
 }
-
+/**
+ * hostService（主机服务）是VSCode中的核心服务之一，负责处理与宿主环境（浏览器或桌面应用）交互的操作。
+ * 它提供了一组与窗口管理、应用生命周期和用户界面交互相关的功能。
+ *
+ * 主要功能包括：
+ * 1. 窗口管理：打开、关闭、切换窗口，控制全屏模式
+ * 2. 焦点管理：监听和控制应用窗口的焦点状态
+ * 3. 应用生命周期：重启应用、重新加载窗口、关闭应用
+ * 4. 截图功能：捕获应用窗口的截图
+ * 5. 原生窗口句柄：获取底层窗口的原生句柄
+ *
+ * hostService在Web环境和桌面环境中有不同的实现：
+ * - BrowserHostService：用于Web环境，通过浏览器API实现功能
+ * - NativeHostService：用于桌面环境，通过Electron API实现更多本地功能
+ */
 registerSingleton(IHostService, WorkbenchHostService, InstantiationType.Delayed);
 registerSingleton(INativeHostService, WorkbenchNativeHostService, InstantiationType.Delayed);

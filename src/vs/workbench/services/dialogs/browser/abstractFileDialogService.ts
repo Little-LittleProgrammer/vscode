@@ -59,10 +59,10 @@ export abstract class AbstractFileDialogService implements IFileDialogService {
 
 	async defaultFilePath(schemeFilter = this.getSchemeFilterForWindow(), authorityFilter = this.getAuthorityFilterForWindow()): Promise<URI> {
 
-		// Check for last active file first...
+		// 优先检查最近活动的文件...
 		let candidate = this.historyService.getLastActiveFile(schemeFilter, authorityFilter);
 
-		// ...then for last active file root
+		// 如果最近活动的文件不存在，则检查最近活动的文件根目录
 		if (!candidate) {
 			candidate = this.historyService.getLastActiveWorkspaceRoot(schemeFilter, authorityFilter);
 		} else {
@@ -195,6 +195,7 @@ export abstract class AbstractFileDialogService implements IFileDialogService {
 		const title = nls.localize('openFileOrFolder.title', 'Open File or Folder');
 		const availableFileSystems = this.addFileSchemaIfNeeded(schema);
 
+		// 选择文件或文件夹
 		const uri = await this.pickResource({ canSelectFiles: true, canSelectFolders: true, canSelectMany: false, defaultUri: options.defaultUri, title, availableFileSystems });
 
 		if (uri) {

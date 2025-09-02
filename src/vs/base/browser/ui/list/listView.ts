@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *  版权所有 (c) Microsoft Corporation。保留所有权利。
+ *  根据 MIT 许可证获得许可。请参阅项目根目录下的 License.txt 获取许可信息。
  *--------------------------------------------------------------------------------------------*/
 
 import { DataTransfers, IDragAndDropData } from '../../dnd.js';
@@ -51,7 +51,7 @@ export interface IListViewDragAndDrop<T> extends IListDragAndDrop<T> {
 }
 
 export const enum ListViewTargetSector {
-	// drop position relative to the top of the item
+	// 拖放位置相对于条目顶部
 	TOP = 0, 				// [0%-25%)
 	CENTER_TOP = 1, 		// [25%-50%)
 	CENTER_BOTTOM = 2, 		// [50%-75%)
@@ -276,14 +276,18 @@ export interface IListView<T> extends ISpliceable<T>, IDisposable {
 }
 
 /**
- * The {@link ListView} is a virtual scrolling engine.
+ * {@link ListView} 是一个虚拟滚动引擎。
  *
- * Given that it only renders elements within its viewport, it can hold large
- * collections of elements and stay very performant. The performance bottleneck
- * usually lies within the user's rendering code for each element.
+ * 由于它只渲染视口内的元素，因此可以容纳大量元素并保持高性能。
+ * 性能瓶颈通常在于用户为每个元素编写的渲染代码。
+ *	主要职责：
+	* 虚拟滚动
+	* DOM 回收
+	* 项目渲染
+	* 滚动事件处理
+	* 拖动支持
  *
- * @remarks It is a low-level widget, not meant to be used directly. Refer to the
- * List widget instead.
+ * @remarks 这是一个底层控件，不建议直接使用。请参考 List 组件。
  */
 export class ListView<T> implements IListView<T> {
 
@@ -350,7 +354,7 @@ export class ListView<T> implements IListView<T> {
 		}
 
 		if (value && this.supportDynamicHeights) {
-			throw new Error('Horizontal scrolling and dynamic heights not supported simultaneously');
+			throw new Error('横向滚动和动态高度不能同时支持');
 		}
 
 		this._horizontalScrolling = value;
@@ -378,7 +382,7 @@ export class ListView<T> implements IListView<T> {
 		options: IListViewOptions<T> = DefaultOptions
 	) {
 		if (options.horizontalScrolling && options.supportDynamicHeights) {
-			throw new Error('Horizontal scrolling and dynamic heights not supported simultaneously');
+			throw new Error('横向滚动和动态高度不能同时支持');
 		}
 
 		this.items = [];
@@ -443,7 +447,7 @@ export class ListView<T> implements IListView<T> {
 		this.disposables.add(addDisposableListener(this.rowsContainer, TouchEventType.Change, e => this.onTouchChange(e as GestureEvent)));
 
 		this.disposables.add(addDisposableListener(this.scrollableElement.getDomNode(), 'scroll', e => {
-			// Make sure the active element is scrolled into view
+			// 确保活动元素滚动到可视区域
 			const element = (e.target as HTMLElement);
 			const scrollValue = element.scrollTop;
 			element.scrollTop = 0;
@@ -458,7 +462,7 @@ export class ListView<T> implements IListView<T> {
 		this.disposables.add(addDisposableListener(this.domNode, 'dragend', e => this.onDragEnd(e)));
 		if (options.userSelection) {
 			if (options.dnd) {
-				throw new Error('DND and user selection cannot be used simultaneously');
+				throw new Error('DND 和用户选择不能同时使用');
 			}
 			this.disposables.add(addDisposableListener(this.domNode, 'mousedown', e => this.onPotentialSelectionStart(e)));
 		}
@@ -485,15 +489,15 @@ export class ListView<T> implements IListView<T> {
 	}
 
 	private _scrollToActiveElement(element: HTMLElement, container: HTMLElement) {
-		// The scroll event on the list only fires when scrolling down.
-		// If the active element is above the viewport, we need to scroll up.
+		// 列表的滚动事件只在向下滚动时触发。
+		// 如果活动元素在视口上方，我们需要向上滚动。
 		const containerRect = container.getBoundingClientRect();
 		const elementRect = element.getBoundingClientRect();
 
 		const topOffset = elementRect.top - containerRect.top;
 
 		if (topOffset < 0) {
-			// Scroll up
+			// 向上滚动
 			this.setScrollTop(this.scrollTop + topOffset);
 		}
 	}
@@ -531,7 +535,7 @@ export class ListView<T> implements IListView<T> {
 		}
 
 		if (options.paddingTop !== undefined && options.paddingTop !== this.rangeMap.paddingTop) {
-			// trigger a rerender
+			// 触发重新渲染
 			const lastRenderRange = this.getRenderRange(this.lastRenderTop, this.lastRenderHeight);
 			const offset = options.paddingTop - this.rangeMap.paddingTop;
 			this.rangeMap.paddingTop = options.paddingTop;
@@ -564,7 +568,7 @@ export class ListView<T> implements IListView<T> {
 
 		if (typeof size === 'undefined') {
 			if (!this.supportDynamicHeights) {
-				console.warn('Dynamic heights not supported', new Error().stack);
+				console.warn('不支持动态高度', new Error().stack);
 				return;
 			}
 
@@ -581,12 +585,12 @@ export class ListView<T> implements IListView<T> {
 		let heightDiff = 0;
 
 		if (index < lastRenderRange.start) {
-			// do not scroll the viewport if resized element is out of viewport
+			// 如果调整大小的元素不在视口内，则不滚动视口
 			heightDiff = size - originalSize;
 		} else {
 			if (anchorIndex !== null && anchorIndex > index && anchorIndex < lastRenderRange.end) {
-				// anchor in viewport
-				// resized element in viewport and above the anchor
+				// 锚点在视口内
+				// 调整大小的元素在视口内且位于锚点上方
 				heightDiff = size - originalSize;
 			} else {
 				heightDiff = 0;
@@ -604,7 +608,7 @@ export class ListView<T> implements IListView<T> {
 		if (this.supportDynamicHeights) {
 			this._rerender(this.lastRenderTop, this.lastRenderHeight);
 		} else {
-			this._onDidChangeContentHeight.fire(this.contentHeight); // otherwise fired in _rerender()
+			this._onDidChangeContentHeight.fire(this.contentHeight); // 否则在 _rerender() 中触发
 		}
 	}
 
@@ -614,7 +618,7 @@ export class ListView<T> implements IListView<T> {
 
 	splice(start: number, deleteCount: number, elements: readonly T[] = []): T[] {
 		if (this.splicing) {
-			throw new Error('Can\'t run recursive splices.');
+			throw new Error('不能递归调用 splice。');
 		}
 
 		this.splicing = true;
@@ -632,7 +636,7 @@ export class ListView<T> implements IListView<T> {
 		const deleteRange = { start, end: start + deleteCount };
 		const removeRange = Range.intersect(previousRenderRange, deleteRange);
 
-		// try to reuse rows, avoid removing them from DOM
+		// 尝试复用行，避免从 DOM 中移除
 		const rowsToDispose = new Map<string, IRow[]>();
 		for (let i = removeRange.end - 1; i >= removeRange.start; i--) {
 			const item = this.items[i];
@@ -682,7 +686,7 @@ export class ListView<T> implements IListView<T> {
 
 		let deleted: IItem<T>[];
 
-		// TODO@joao: improve this optimization to catch even more cases
+		// TODO@joao: 改进此优化以捕获更多情况
 		if (start === 0 && deleteCount >= this.items.length) {
 			this.rangeMap = this.createRangeMap(this.rangeMap.paddingTop);
 			this.rangeMap.splice(0, 0, inserted);
@@ -895,7 +899,7 @@ export class ListView<T> implements IListView<T> {
 		}
 	}
 
-	// Render
+	// 渲染
 
 	protected render(previousRenderRange: IRange, renderTop: number, renderHeight: number, renderLeft: number | undefined, scrollWidth: number | undefined, updateItemsInDOM: boolean = false): void {
 		const renderRange = this.getRenderRange(renderTop, renderHeight);
@@ -939,7 +943,7 @@ export class ListView<T> implements IListView<T> {
 		this.lastRenderHeight = renderHeight;
 	}
 
-	// DOM operations
+	// DOM 操作
 
 	private insertItemInDOM(index: number, row?: IRow): void {
 		const item = this.items[index];
@@ -981,7 +985,7 @@ export class ListView<T> implements IListView<T> {
 		const renderer = this.renderers.get(item.templateId);
 
 		if (!renderer) {
-			throw new Error(`No renderer found for template id ${item.templateId}`);
+			throw new Error(`未找到模板 id 为 ${item.templateId} 的渲染器`);
 		}
 
 		renderer?.renderElement(item.element, index, item.row.templateData, item.size);
@@ -1105,7 +1109,7 @@ export class ListView<T> implements IListView<T> {
 		return this._scrollHeight + (this.horizontalScrolling ? 10 : 0) + this.paddingBottom;
 	}
 
-	// Events
+	// 事件
 
 	@memoize get onMouseClick(): Event<IListMouseEvent<T>> { return Event.map(this.disposables.add(new DomEmitter(this.domNode, 'click')).event, e => this.toMouseEvent(e), this.disposables); }
 	@memoize get onMouseDblClick(): Event<IListMouseEvent<T>> { return Event.map(this.disposables.add(new DomEmitter(this.domNode, 'dblclick')).event, e => this.toMouseEvent(e), this.disposables); }
@@ -1157,7 +1161,7 @@ export class ListView<T> implements IListView<T> {
 				this._rerender(e.scrollTop, e.height, e.inSmoothScrolling);
 			}
 		} catch (err) {
-			console.error('Got bad scroll event:', e);
+			console.error('收到错误的滚动事件:', e);
 			throw err;
 		}
 	}
@@ -1169,7 +1173,7 @@ export class ListView<T> implements IListView<T> {
 		this.scrollTop -= event.translationY;
 	}
 
-	// DND
+	// 拖放（DND）
 
 	private onDragStart(element: T, uri: string, event: DragEvent): void {
 		if (!event.dataTransfer) {
@@ -1189,7 +1193,7 @@ export class ListView<T> implements IListView<T> {
 			label = String(elements.length);
 		}
 
-		applyDragImage(event, this.domNode, label, [this.domId /* add domId to get list specific styling */]);
+		applyDragImage(event, this.domNode, label, [this.domId /* 添加 domId 以获得列表特定样式 */]);
 
 		this.domNode.classList.add('dragging');
 		this.currentDragData = new ElementsDragAndDropData(elements);
@@ -1202,15 +1206,14 @@ export class ListView<T> implements IListView<T> {
 		this.currentSelectionDisposable.dispose();
 		const doc = getDocument(this.domNode);
 
-		// Set up both the 'movement store' for watching the mouse, and the
-		// 'selection store' which lasts as long as there's a selection, even
-		// after the usr has stopped modifying it.
+		// 同时设置用于监听鼠标的“移动存储”，以及
+		// “选择存储”，即使用户停止修改选择后也会持续存在。
 		const selectionStore = this.currentSelectionDisposable = new DisposableStore();
 		const movementStore = selectionStore.add(new DisposableStore());
 
-		// The selection events we get from the DOM are fairly limited and we lack a 'selection end' event.
-		// Selection events also don't tell us where the input doing the selection is. So, make a poor
-		// assumption that a user is using the mouse, and base our events on that.
+		// 我们从 DOM 获取到的选择事件非常有限，缺少“选择结束”事件。
+		// 选择事件也不会告诉我们正在进行选择的输入设备在哪里。因此，做一个
+		// 粗略假设用户正在使用鼠标，并基于此处理事件。
 		movementStore.add(addDisposableListener(this.domNode, 'selectstart', () => {
 			movementStore.add(addDisposableListener(doc, 'mousemove', e => {
 				if (doc.getSelection()?.isCollapsed === false) {
@@ -1218,8 +1221,8 @@ export class ListView<T> implements IListView<T> {
 				}
 			}));
 
-			// The selection is cleared either on mouseup if there's no selection, or on next mousedown
-			// when `this.currentSelectionDisposable` is reset.
+			// 选择会在 mouseup 时如果没有选择被清除，或者在下次 mousedown 时
+			// `this.currentSelectionDisposable` 被重置时清除。
 			selectionStore.add(toDisposable(() => {
 				const previousRenderRange = this.getRenderRange(this.lastRenderTop, this.lastRenderHeight);
 				this.currentSelectionBounds = undefined;
@@ -1227,7 +1230,7 @@ export class ListView<T> implements IListView<T> {
 			}));
 			selectionStore.add(addDisposableListener(doc, 'selectionchange', () => {
 				const selection = doc.getSelection();
-				// if the selection changed _after_ mouseup, it's from clearing the list or similar, so teardown
+				// 如果 selection 在 mouseup 之后发生变化，说明是清空列表或类似操作，需销毁
 				if (!selection || selection.isCollapsed) {
 					if (movementStore.isDisposed) {
 						selectionStore.dispose();
@@ -1273,7 +1276,7 @@ export class ListView<T> implements IListView<T> {
 	}
 
 	private onDragOver(event: IListDragEvent<T>): boolean {
-		event.browserEvent.preventDefault(); // needed so that the drop event fires (https://stackoverflow.com/questions/21339924/drop-event-not-firing-in-chrome)
+		event.browserEvent.preventDefault(); // 需要此操作以确保 drop 事件触发（https://stackoverflow.com/questions/21339924/drop-event-not-firing-in-chrome）
 
 		this.onDragLeaveTimeout.dispose();
 
@@ -1287,14 +1290,14 @@ export class ListView<T> implements IListView<T> {
 			return false;
 		}
 
-		// Drag over from outside
+		// 从外部拖拽
 		if (!this.currentDragData) {
 			if (StaticDND.CurrentDragAndDropData) {
-				// Drag over from another list
+				// 从另一个列表拖拽
 				this.currentDragData = StaticDND.CurrentDragAndDropData;
 
 			} else {
-				// Drag over from the desktop
+				// 从桌面拖拽
 				if (!event.browserEvent.dataTransfer.types) {
 					return false;
 				}
@@ -1326,7 +1329,7 @@ export class ListView<T> implements IListView<T> {
 			}
 		}
 
-		// sanitize feedback list
+		// 清理反馈列表
 		feedback = distinct(feedback).filter(i => i >= -1 && i < this.length).sort((a, b) => a - b);
 		feedback = feedback[0] === -1 ? [-1] : feedback;
 
@@ -1340,7 +1343,7 @@ export class ListView<T> implements IListView<T> {
 		this.currentDragFeedbackPosition = dragOverEffectPosition;
 		this.currentDragFeedbackDisposable.dispose();
 
-		if (feedback[0] === -1) { // entire list feedback
+		if (feedback[0] === -1) { // 整个列表反馈
 			this.domNode.classList.add(dragOverEffectPosition);
 			this.rowsContainer.classList.add(dragOverEffectPosition);
 			this.currentDragFeedbackDisposable = toDisposable(() => {
@@ -1350,11 +1353,11 @@ export class ListView<T> implements IListView<T> {
 		} else {
 
 			if (feedback.length > 1 && dragOverEffectPosition !== ListDragOverEffectPosition.Over) {
-				throw new Error('Can\'t use multiple feedbacks with position different than \'over\'');
+				throw new Error('不能在 position 不为 over 时使用多个反馈');
 			}
 
-			// Make sure there is no flicker when moving between two items
-			// Always use the before feedback if possible
+			// 确保在两个条目之间移动时没有闪烁
+			// 尽可能总是使用 before 反馈
 			if (dragOverEffectPosition === ListDragOverEffectPosition.After) {
 				if (feedback[0] < this.length - 1) {
 					feedback[0] += 1;
@@ -1429,7 +1432,7 @@ export class ListView<T> implements IListView<T> {
 		this.currentDragFeedbackDisposable = Disposable.None;
 	}
 
-	// DND scroll top animation
+	// 拖放滚动动画
 
 	private setupDragAndDropScrollTopAnimation(event: DragEvent | MouseEvent): void {
 		if (!this.dragOverAnimationDisposable) {
@@ -1472,7 +1475,7 @@ export class ListView<T> implements IListView<T> {
 		}
 	}
 
-	// Util
+	// 工具方法
 
 	private getTargetSector(browserEvent: DragEvent, targetIndex: number | undefined): ListViewTargetSector | undefined {
 		if (targetIndex === undefined) {
@@ -1524,14 +1527,13 @@ export class ListView<T> implements IListView<T> {
 	}
 
 	/**
-	 * Given a stable rendered state, checks every rendered element whether it needs
-	 * to be probed for dynamic height. Adjusts scroll height and top if necessary.
+	 * 在渲染状态稳定的情况下，检查每个已渲染元素是否需要探测动态高度。
+	 * 如有必要，调整滚动高度和顶部。
 	 */
 	protected _rerender(renderTop: number, renderHeight: number, inSmoothScrolling?: boolean): void {
 		const previousRenderRange = this.getRenderRange(renderTop, renderHeight);
 
-		// Let's remember the second element's position, this helps in scrolling up
-		// and preserving a linear upwards scroll movement
+		// 记住第二个元素的位置，有助于向上滚动时保持线性滚动
 		let anchorElementIndex: number | undefined;
 		let anchorElementTopDelta: number | undefined;
 
@@ -1591,11 +1593,11 @@ export class ListView<T> implements IListView<T> {
 				}
 
 				if (typeof anchorElementIndex === 'number') {
-					// To compute a destination scroll top, we need to take into account the current smooth scrolling
-					// animation, and then reuse it with a new target (to avoid prolonging the scroll)
-					// See https://github.com/microsoft/vscode/issues/104144
-					// See https://github.com/microsoft/vscode/pull/104284
-					// See https://github.com/microsoft/vscode/issues/107704
+					// 为了计算目标 scrollTop，需要考虑当前的平滑滚动动画，
+					// 然后用新目标复用它（避免延长滚动时间）
+					// 参见 https://github.com/microsoft/vscode/issues/104144
+					// 参见 https://github.com/microsoft/vscode/pull/104284
+					// 参见 https://github.com/microsoft/vscode/issues/107704
 					const deltaScrollTop = this.scrollable.getFutureScrollPosition().scrollTop - renderTop;
 					const newScrollTop = this.elementTop(anchorElementIndex) - anchorElementTopDelta! + deltaScrollTop;
 					this.setScrollTop(newScrollTop, inSmoothScrolling);
@@ -1634,7 +1636,7 @@ export class ListView<T> implements IListView<T> {
 			item.row.domNode.style.height = '';
 			item.size = item.row.domNode.offsetHeight;
 			if (item.size === 0 && !isAncestor(item.row.domNode, getWindow(item.row.domNode).document.body)) {
-				console.warn('Measuring item node that is not in DOM! Add ListView to the DOM before measuring row height!', new Error().stack);
+				console.warn('测量的条目节点不在 DOM 中！请在测量行高前将 ListView 添加到 DOM！', new Error().stack);
 			}
 			item.lastDynamicHeightWidth = this.renderWidth;
 			return item.size - size;
@@ -1647,7 +1649,7 @@ export class ListView<T> implements IListView<T> {
 		const renderer = this.renderers.get(item.templateId);
 
 		if (!renderer) {
-			throw new BugIndicatingError('Missing renderer for templateId: ' + item.templateId);
+			throw new BugIndicatingError('缺少模板 id 的渲染器: ' + item.templateId);
 		}
 
 		renderer.renderElement(item.element, index, row.templateData, undefined);
@@ -1667,7 +1669,7 @@ export class ListView<T> implements IListView<T> {
 		return `${this.domId}_${index}`;
 	}
 
-	// Dispose
+	// 销毁
 
 	dispose() {
 		for (const item of this.items) {

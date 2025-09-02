@@ -158,16 +158,50 @@ export class Workbench extends Layout {
 				// 注册监听器
 				this.registerListeners(lifecycleService, storageService, configurationService, hostService, dialogService);
 
-				// 渲染工作台
+				/**
+				 * 步骤1: 渲染工作台基础结构
+				 * - 创建工作台的基础DOM结构和各个部件的容器元素
+				 * - 初始化字体和样式设置（如字体抗锯齿处理）
+				 * - 创建各个核心部件（标题栏、活动栏、侧边栏、编辑器区域、面板、状态栏等）
+				 * - 为每个部件创建DOM容器，并调用各部件的create()方法进行初始化
+				 * - 创建通知处理程序，用于显示通知和消息
+				 * - 将整个工作台容器(mainContainer)添加到DOM中
+				 */
 				this.renderWorkbench(instantiationService, notificationService, storageService, configurationService);
 
-				// 工作台布局
+				/**
+				 * 步骤2: 创建工作台布局管理器
+				 * - 初始化工作台的布局系统，创建Grid布局管理器
+				 * - 定义各个部件在网格中的位置、大小和层级关系
+				 * - 创建SerializableGrid实例，用于管理部件之间的布局关系
+				 * - 设置部件的可见性、大小比例和初始状态
+				 * - 处理部件之间的拖拽分隔线，允许用户调整各部件大小
+				 * - 将网格布局结构(workbenchGrid.element)添加到mainContainer中
+				 */
 				this.createWorkbenchLayout();
 
-				// 布局
+				/**
+				 * 步骤3: 应用布局计算
+				 * - 计算工作台容器的实际尺寸（宽度和高度）
+				 * - 设置mainContainer的位置和大小
+				 * - 调用workbenchGrid.layout()方法，根据当前窗口尺寸计算并应用各部件的实际大小
+				 * - 触发布局事件，通知各个部件进行内部布局调整
+				 * - 设置initialized标志，表明工作台已完成初始化
+				 * - 处理全屏模式、Zen模式等特殊布局状态
+				 */
 				this.layout();
 
-				// 恢复
+				/**
+				 * 步骤4: 恢复工作台状态
+				 * - 恢复用户之前的工作状态，包括打开的编辑器、视图和布局设置
+				 * - 调用restoreParts()方法，恢复各个部件的状态
+				 * - 恢复编辑器的内容、分组和布局
+				 * - 恢复侧边栏、面板和辅助栏中的视图
+				 * - 恢复Zen模式、编辑器居中模式等特殊状态
+				 * - 处理布局的异步恢复操作，确保界面响应性
+				 * - 完成后，将生命周期阶段设置为"Restored"，然后延迟设置为"Eventually"
+				 * - 触发性能标记，用于测量工作台启动时间
+				 */
 				this.restore(lifecycleService);
 			});
 
@@ -193,6 +227,9 @@ export class Workbench extends Layout {
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 		// 所有贡献的服务
+		/**
+		 * 获取所有单例服务描述符, IHostService\WorkbenchHostService\WorkbenchNativeHostService\INativeHostService
+		 */
 		const contributedServices = getSingletonServiceDescriptors();
 		for (const [id, descriptor] of contributedServices) {
 			serviceCollection.set(id, descriptor);

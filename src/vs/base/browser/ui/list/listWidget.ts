@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *  版权所有 (c) Microsoft Corporation。保留所有权利。
+ *  根据 MIT 许可证获得许可。有关详细信息，请参阅项目根目录下的 License.txt。
  *--------------------------------------------------------------------------------------------*/
 
 import { IDragAndDropData } from '../../dnd.js';
@@ -49,6 +49,7 @@ interface IRenderedContainer {
 	index: number;
 }
 
+// TraitRenderer 用于渲染特性（如选中、聚焦等）到 DOM 元素
 class TraitRenderer<T> implements IListRenderer<T, ITraitTemplateData> {
 	private renderedElements: IRenderedContainer[] = [];
 
@@ -114,6 +115,7 @@ class TraitRenderer<T> implements IListRenderer<T, ITraitTemplateData> {
 	}
 }
 
+// Trait 用于管理某一特性（如选中、聚焦等）在列表中的索引
 class Trait<T> implements ISpliceable<boolean>, IDisposable {
 
 	protected indexes: number[] = [];
@@ -164,10 +166,10 @@ class Trait<T> implements ISpliceable<boolean>, IDisposable {
 	}
 
 	/**
-	 * Sets the indexes which should have this trait.
+	 * 设置应该拥有此特性的索引。
 	 *
-	 * @param indexes Indexes which should have this trait.
-	 * @return The old indexes which had this trait.
+	 * @param indexes 应该拥有此特性的索引。
+	 * @return 之前拥有此特性的旧索引。
 	 */
 	set(indexes: number[], browserEvent?: UIEvent): number[] {
 		return this._set(indexes, [...indexes].sort(numericSort), browserEvent);
@@ -200,6 +202,7 @@ class Trait<T> implements ISpliceable<boolean>, IDisposable {
 	}
 }
 
+// SelectionTrait 用于管理选中状态的特性
 class SelectionTrait<T> extends Trait<T> {
 
 	constructor(private setAriaSelected: boolean) {
@@ -220,9 +223,8 @@ class SelectionTrait<T> extends Trait<T> {
 }
 
 /**
- * The TraitSpliceable is used as a util class to be able
- * to preserve traits across splice calls, given an identity
- * provider.
+ * TraitSpliceable 是一个工具类，用于在有 identityProvider 的情况下，
+ * 在 splice 操作中保留特性。
  */
 class TraitSpliceable<T> implements ISpliceable<T> {
 
@@ -248,6 +250,7 @@ class TraitSpliceable<T> implements ISpliceable<T> {
 	}
 }
 
+// 判断元素是否为某个类的后代
 function isListElementDescendantOfClass(e: HTMLElement, className: string): boolean {
 	if (e.classList.contains(className)) {
 		return true;
@@ -264,30 +267,37 @@ function isListElementDescendantOfClass(e: HTMLElement, className: string): bool
 	return isListElementDescendantOfClass(e.parentElement, className);
 }
 
+// 判断是否为 Monaco 编辑器元素
 export function isMonacoEditor(e: HTMLElement): boolean {
 	return isListElementDescendantOfClass(e, 'monaco-editor');
 }
 
+// 判断是否为 Monaco 自定义切换元素
 export function isMonacoCustomToggle(e: HTMLElement): boolean {
 	return isListElementDescendantOfClass(e, 'monaco-custom-toggle');
 }
 
+// 判断是否为操作项元素
 export function isActionItem(e: HTMLElement): boolean {
 	return isListElementDescendantOfClass(e, 'action-item');
 }
 
+// 判断是否为 Monaco 展开收起图标元素
 export function isMonacoTwistie(e: HTMLElement): boolean {
 	return isListElementDescendantOfClass(e, 'monaco-tl-twistie');
 }
 
+// 判断是否为粘性滚动元素
 export function isStickyScrollElement(e: HTMLElement): boolean {
 	return isListElementDescendantOfClass(e, 'monaco-tree-sticky-row');
 }
 
+// 判断是否为粘性滚动容器
 export function isStickyScrollContainer(e: HTMLElement): boolean {
 	return e.classList.contains('monaco-tree-sticky-container');
 }
 
+// 判断是否为按钮
 export function isButton(e: HTMLElement): boolean {
 	if ((e.tagName === 'A' && e.classList.contains('monaco-button')) ||
 		(e.tagName === 'DIV' && e.classList.contains('monaco-button-dropdown'))) {
@@ -305,6 +315,7 @@ export function isButton(e: HTMLElement): boolean {
 	return isButton(e.parentElement);
 }
 
+// 键盘控制器，处理键盘事件
 class KeyboardController<T> implements IDisposable {
 
 	private readonly disposables = new DisposableStore();
@@ -424,16 +435,19 @@ class KeyboardController<T> implements IDisposable {
 	}
 }
 
+// 键盘导航模式
 export enum TypeNavigationMode {
 	Automatic,
 	Trigger
 }
 
+// 键盘导航控制器状态
 enum TypeNavigationControllerState {
 	Idle,
 	Typing
 }
 
+// 默认键盘导航委托
 export const DefaultKeyboardNavigationDelegate = new class implements IKeyboardNavigationDelegate {
 	mightProducePrintableCharacter(event: IKeyboardEvent): boolean {
 		if (event.ctrlKey || event.metaKey || event.altKey) {
@@ -447,6 +461,7 @@ export const DefaultKeyboardNavigationDelegate = new class implements IKeyboardN
 	}
 };
 
+// 键盘类型导航控制器
 class TypeNavigationController<T> implements IDisposable {
 
 	private enabled = false;
@@ -526,8 +541,8 @@ class TypeNavigationController<T> implements IDisposable {
 	private onClear(): void {
 		const focus = this.list.getFocus();
 		if (focus.length > 0 && focus[0] === this.previouslyFocused) {
-			// List: re-announce element on typing end since typed keys will interrupt aria label of focused element
-			// Do not announce if there was a focus change at the end to prevent duplication https://github.com/microsoft/vscode/issues/95961
+			// List: 在输入结束时重新播报元素，因为输入的按键会中断聚焦元素的 aria label
+			// 如果最后有焦点变化则不播报，防止重复 https://github.com/microsoft/vscode/issues/95961
 			const ariaLabel = this.list.options.accessibilityProvider?.getAriaLabel(this.list.element(focus[0]));
 
 			if (typeof ariaLabel === 'string') {
@@ -559,7 +574,7 @@ class TypeNavigationController<T> implements IDisposable {
 			if (this.list.options.typeNavigationEnabled) {
 				if (typeof labelStr !== 'undefined') {
 
-					// If prefix is found, focus and return early
+					// 如果找到前缀，聚焦并提前返回
 					if (matchesPrefix(word, labelStr)) {
 						this.previouslyFocused = start;
 						this.list.setFocus([index]);
@@ -571,7 +586,7 @@ class TypeNavigationController<T> implements IDisposable {
 
 					if (fuzzy) {
 						const fuzzyScore = fuzzy[0].end - fuzzy[0].start;
-						// ensures that when fuzzy matching, doesn't clash with prefix matching (1 input vs 1+ should be prefix and fuzzy respecitvely). Also makes sure that exact matches are prioritized.
+						// 确保模糊匹配时不会与前缀匹配冲突（1 个输入为前缀，多于 1 个为模糊），并优先精确匹配
 						if (fuzzyScore > 1 && fuzzy.length === 1) {
 							this.previouslyFocused = start;
 							this.list.setFocus([index]);
@@ -596,6 +611,7 @@ class TypeNavigationController<T> implements IDisposable {
 	}
 }
 
+// DOM 聚焦控制器，处理 Tab 键聚焦
 class DOMFocusController<T> implements IDisposable {
 
 	private readonly disposables = new DisposableStore();
@@ -652,23 +668,28 @@ class DOMFocusController<T> implements IDisposable {
 	}
 }
 
+// 判断是否为单选切换事件
 export function isSelectionSingleChangeEvent(event: IListMouseEvent<any> | IListTouchEvent<any>): boolean {
 	return platform.isMacintosh ? event.browserEvent.metaKey : event.browserEvent.ctrlKey;
 }
 
+// 判断是否为范围选中切换事件
 export function isSelectionRangeChangeEvent(event: IListMouseEvent<any> | IListTouchEvent<any>): boolean {
 	return event.browserEvent.shiftKey;
 }
 
+// 判断是否为鼠标右键点击
 function isMouseRightClick(event: UIEvent): boolean {
 	return isMouseEvent(event) && event.button === 2;
 }
 
+// 默认多选控制器
 const DefaultMultipleSelectionController = {
 	isSelectionSingleChangeEvent,
 	isSelectionRangeChangeEvent
 };
 
+// 鼠标控制器，处理鼠标相关事件
 export class MouseController<T> implements IDisposable {
 
 	private multipleSelectionController: IMultipleSelectionController<T> | undefined;
@@ -845,15 +866,18 @@ export class MouseController<T> implements IDisposable {
 	}
 }
 
+// 多选控制器接口
 export interface IMultipleSelectionController<T> {
 	isSelectionSingleChangeEvent(event: IListMouseEvent<T> | IListTouchEvent<T>): boolean;
 	isSelectionRangeChangeEvent(event: IListMouseEvent<T> | IListTouchEvent<T>): boolean;
 }
 
+// 样式控制器接口
 export interface IStyleController {
 	style(styles: IListStyles): void;
 }
 
+// 列表可访问性提供者接口
 export interface IListAccessibilityProvider<T> extends IListViewAccessibilityProvider<T> {
 	getAriaLabel(element: T): string | IObservable<string> | null;
 	getWidgetAriaLabel(): string;
@@ -863,6 +887,7 @@ export interface IListAccessibilityProvider<T> extends IListViewAccessibilityPro
 	getActiveDescendantId?(element: T): string | undefined;
 }
 
+// 默认样式控制器
 export class DefaultStyleController implements IStyleController {
 
 	constructor(private styleElement: HTMLStyleElement, private selectorSuffix: string) { }
@@ -877,7 +902,7 @@ export class DefaultStyleController implements IStyleController {
 
 		if (styles.listFocusBackground) {
 			content.push(`.monaco-list${suffix}:focus .monaco-list-row.focused { background-color: ${styles.listFocusBackground}; }`);
-			content.push(`.monaco-list${suffix}:focus .monaco-list-row.focused:hover { background-color: ${styles.listFocusBackground}; }`); // overwrite :hover style in this case!
+			content.push(`.monaco-list${suffix}:focus .monaco-list-row.focused:hover { background-color: ${styles.listFocusBackground}; }`); // 此处覆盖 :hover 样式！
 		}
 
 		if (styles.listFocusForeground) {
@@ -886,7 +911,7 @@ export class DefaultStyleController implements IStyleController {
 
 		if (styles.listActiveSelectionBackground) {
 			content.push(`.monaco-list${suffix}:focus .monaco-list-row.selected { background-color: ${styles.listActiveSelectionBackground}; }`);
-			content.push(`.monaco-list${suffix}:focus .monaco-list-row.selected:hover { background-color: ${styles.listActiveSelectionBackground}; }`); // overwrite :hover style in this case!
+			content.push(`.monaco-list${suffix}:focus .monaco-list-row.selected:hover { background-color: ${styles.listActiveSelectionBackground}; }`); // 此处覆盖 :hover 样式！
 		}
 
 		if (styles.listActiveSelectionForeground) {
@@ -913,7 +938,7 @@ export class DefaultStyleController implements IStyleController {
 
 		if (styles.listInactiveFocusForeground) {
 			content.push(`.monaco-list${suffix} .monaco-list-row.focused { color:  ${styles.listInactiveFocusForeground}; }`);
-			content.push(`.monaco-list${suffix} .monaco-list-row.focused:hover { color:  ${styles.listInactiveFocusForeground}; }`); // overwrite :hover style in this case!
+			content.push(`.monaco-list${suffix} .monaco-list-row.focused:hover { color:  ${styles.listInactiveFocusForeground}; }`); // 此处覆盖 :hover 样式！
 		}
 
 		if (styles.listInactiveSelectionIconForeground) {
@@ -922,12 +947,12 @@ export class DefaultStyleController implements IStyleController {
 
 		if (styles.listInactiveFocusBackground) {
 			content.push(`.monaco-list${suffix} .monaco-list-row.focused { background-color:  ${styles.listInactiveFocusBackground}; }`);
-			content.push(`.monaco-list${suffix} .monaco-list-row.focused:hover { background-color:  ${styles.listInactiveFocusBackground}; }`); // overwrite :hover style in this case!
+			content.push(`.monaco-list${suffix} .monaco-list-row.focused:hover { background-color:  ${styles.listInactiveFocusBackground}; }`); // 此处覆盖 :hover 样式！
 		}
 
 		if (styles.listInactiveSelectionBackground) {
 			content.push(`.monaco-list${suffix} .monaco-list-row.selected { background-color:  ${styles.listInactiveSelectionBackground}; }`);
-			content.push(`.monaco-list${suffix} .monaco-list-row.selected:hover { background-color:  ${styles.listInactiveSelectionBackground}; }`); // overwrite :hover style in this case!
+			content.push(`.monaco-list${suffix} .monaco-list-row.selected:hover { background-color:  ${styles.listInactiveSelectionBackground}; }`); // 此处覆盖 :hover 样式！
 		}
 
 		if (styles.listInactiveSelectionForeground) {
@@ -943,14 +968,14 @@ export class DefaultStyleController implements IStyleController {
 		}
 
 		/**
-		 * Outlines
+		 * 边框
 		 */
 		const focusAndSelectionOutline = asCssValueWithDefault(styles.listFocusAndSelectionOutline, asCssValueWithDefault(styles.listSelectionOutline, styles.listFocusOutline ?? ''));
-		if (focusAndSelectionOutline) { // default: listFocusOutline
+		if (focusAndSelectionOutline) { // 默认：listFocusOutline
 			content.push(`.monaco-list${suffix}:focus .monaco-list-row.focused.selected { outline: 1px solid ${focusAndSelectionOutline}; outline-offset: -1px;}`);
 		}
 
-		if (styles.listFocusOutline) { // default: set
+		if (styles.listFocusOutline) { // 默认：已设置
 			content.push(`
 				.monaco-drag-image${suffix},
 				.monaco-list${suffix}:focus .monaco-list-row.focused,
@@ -963,15 +988,15 @@ export class DefaultStyleController implements IStyleController {
 			content.push(`.monaco-list${suffix} .monaco-list-row.focused.selected { outline: 1px dotted ${inactiveFocusAndSelectionOutline}; outline-offset: -1px; }`);
 		}
 
-		if (styles.listSelectionOutline) { // default: activeContrastBorder
+		if (styles.listSelectionOutline) { // 默认：activeContrastBorder
 			content.push(`.monaco-list${suffix} .monaco-list-row.selected { outline: 1px dotted ${styles.listSelectionOutline}; outline-offset: -1px; }`);
 		}
 
-		if (styles.listInactiveFocusOutline) { // default: null
+		if (styles.listInactiveFocusOutline) { // 默认：null
 			content.push(`.monaco-list${suffix} .monaco-list-row.focused { outline: 1px dotted ${styles.listInactiveFocusOutline}; outline-offset: -1px; }`);
 		}
 
-		if (styles.listHoverOutline) {  // default: activeContrastBorder
+		if (styles.listHoverOutline) {  // 默认：activeContrastBorder
 			content.push(`.monaco-list${suffix} .monaco-list-row:hover { outline: 1px dashed ${styles.listHoverOutline}; outline-offset: -1px; }`);
 		}
 
@@ -1028,16 +1053,19 @@ export class DefaultStyleController implements IStyleController {
 	}
 }
 
+// 键盘导航事件过滤器接口
 export interface IKeyboardNavigationEventFilter {
 	(e: StandardKeyboardEvent): boolean;
 }
 
+// 列表选项更新接口
 export interface IListOptionsUpdate extends IListViewOptionsUpdate {
 	readonly typeNavigationEnabled?: boolean;
 	readonly typeNavigationMode?: TypeNavigationMode;
 	readonly multipleSelectionSupport?: boolean;
 }
 
+// 列表选项接口
 export interface IListOptions<T> extends IListOptionsUpdate {
 	readonly identityProvider?: IIdentityProvider<T>;
 	readonly dnd?: IListDragAndDrop<T>;
@@ -1049,7 +1077,7 @@ export interface IListOptions<T> extends IListOptionsUpdate {
 	readonly accessibilityProvider?: IListAccessibilityProvider<T>;
 	readonly keyboardNavigationEventFilter?: IKeyboardNavigationEventFilter;
 
-	// list view options
+	// 列表视图选项
 	readonly useShadows?: boolean;
 	readonly verticalScrollMode?: ScrollbarVisibility;
 	readonly setRowLineHeight?: boolean;
@@ -1068,6 +1096,7 @@ export interface IListOptions<T> extends IListOptionsUpdate {
 	readonly paddingBottom?: number;
 }
 
+// 列表样式接口
 export interface IListStyles {
 	listBackground: string | undefined;
 	listFocusBackground: string | undefined;
@@ -1100,6 +1129,7 @@ export interface IListStyles {
 	tableOddRowsBackgroundColor: string | undefined;
 }
 
+// 未主题化的默认列表样式
 export const unthemedListStyles: IListStyles = {
 	listFocusBackground: '#7FB0D0',
 	listActiveSelectionBackground: '#0E639C',
@@ -1132,6 +1162,7 @@ export const unthemedListStyles: IListStyles = {
 	treeStickyScrollShadow: undefined
 };
 
+// 默认列表选项
 const DefaultOptions: IListOptions<any> = {
 	keyboardSupport: true,
 	mouseSupport: true,
@@ -1145,8 +1176,9 @@ const DefaultOptions: IListOptions<any> = {
 	}
 };
 
-// TODO@Joao: move these utils into a SortedArray class
+// TODO@Joao: 将这些工具函数移到 SortedArray 类中
 
+// 获取包含指定值的连续区间
 function getContiguousRangeContaining(range: number[], value: number): number[] {
 	const index = range.indexOf(value);
 
@@ -1170,8 +1202,7 @@ function getContiguousRangeContaining(range: number[], value: number): number[] 
 }
 
 /**
- * Given two sorted collections of numbers, returns the intersection
- * between them (OR).
+ * 给定两个已排序的数字集合，返回它们的并集（OR）。
  */
 function disjunction(one: number[], other: number[]): number[] {
 	const result: number[] = [];
@@ -1198,8 +1229,7 @@ function disjunction(one: number[], other: number[]): number[] {
 }
 
 /**
- * Given two sorted collections of numbers, returns the relative
- * complement between them (XOR).
+ * 给定两个已排序的数字集合，返回它们的对称差（XOR）。
  */
 function relativeComplement(one: number[], other: number[]): number[] {
 	const result: number[] = [];
@@ -1224,8 +1254,10 @@ function relativeComplement(one: number[], other: number[]): number[] {
 	return result;
 }
 
+// 数字排序函数
 const numericSort = (a: number, b: number) => a - b;
 
+// 渲染器流水线
 class PipelineRenderer<T> implements IListRenderer<T, any> {
 
 	constructor(
@@ -1268,6 +1300,7 @@ class PipelineRenderer<T> implements IListRenderer<T, any> {
 	}
 }
 
+// 可访问性渲染器
 class AccessibiltyRenderer<T> implements IListRenderer<T, IAccessibilityTemplateData> {
 
 	templateId: string = 'a18n';
@@ -1312,6 +1345,7 @@ class AccessibiltyRenderer<T> implements IListRenderer<T, IAccessibilityTemplate
 	}
 }
 
+// 列表视图拖放实现
 class ListViewDragAndDrop<T> implements IListViewDragAndDrop<T> {
 
 	constructor(private list: List<T>, private dnd: IListDragAndDrop<T>) { }
@@ -1360,19 +1394,18 @@ class ListViewDragAndDrop<T> implements IListViewDragAndDrop<T> {
 }
 
 /**
- * The {@link List} is a virtual scrolling widget, built on top of the {@link ListView}
- * widget.
+ * {@link List} 是一个虚拟滚动控件，基于 {@link ListView} 实现。
  *
- * Features:
- * - Customizable keyboard and mouse support
- * - Element traits: focus, selection, achor
- * - Accessibility support
- * - Touch support
- * - Performant template-based rendering
- * - Horizontal scrolling
- * - Variable element height support
- * - Dynamic element height support
- * - Drag-and-drop support
+ * 功能：
+ * - 可定制的键盘和鼠标支持
+ * - 元素特性：聚焦、选中、锚点
+ * - 可访问性支持
+ * - 触摸支持
+ * - 高性能的基于模板的渲染
+ * - 横向滚动
+ * - 可变元素高度支持
+ * - 动态元素高度支持
+ * - 拖放支持
  */
 export class List<T> implements ISpliceable<T>, IDisposable {
 
@@ -1414,11 +1447,11 @@ export class List<T> implements ISpliceable<T>, IDisposable {
 	get onTap(): Event<IListGestureEvent<T>> { return this.view.onTap; }
 
 	/**
-	 * Possible context menu trigger events:
-	 * - ContextMenu key
+	 * 可能的上下文菜单触发事件：
+	 * - ContextMenu 键
 	 * - Shift F10
-	 * - Ctrl Option Shift M (macOS with VoiceOver)
-	 * - Mouse right click
+	 * - Ctrl Option Shift M（macOS 上的 VoiceOver）
+	 * - 鼠标右键点击
 	 */
 	@memoize get onContextMenu(): Event<IListContextMenuEvent<T>> {
 		let didJustPressContextMenuKey = false;
@@ -1774,7 +1807,7 @@ export class List<T> implements ISpliceable<T>, IDisposable {
 			const previousScrollTop = this.view.getScrollTop();
 			let nextpageScrollTop = previousScrollTop + this.view.renderHeight;
 			if (lastPageIndex > currentlyFocusedElementIndex) {
-				// scroll last page element to the top only if the last page element is below the focused element
+				// 仅当最后一页元素在聚焦元素下方时，将其滚动到顶部
 				nextpageScrollTop -= this.view.elementHeight(lastPageIndex);
 			}
 
@@ -1783,7 +1816,7 @@ export class List<T> implements ISpliceable<T>, IDisposable {
 			if (this.view.getScrollTop() !== previousScrollTop) {
 				this.setFocus([]);
 
-				// Let the scroll event listener run
+				// 让滚动事件监听器先运行
 				await timeout(0);
 				await this.focusNextPage(browserEvent, filter);
 			}
@@ -1818,7 +1851,7 @@ export class List<T> implements ISpliceable<T>, IDisposable {
 			if (this.view.getScrollTop() + getPaddingTop() !== previousScrollTop) {
 				this.setFocus([]);
 
-				// Let the scroll event listener run
+				// 让滚动事件监听器先运行
 				await timeout(0);
 				await this.focusPreviousPage(browserEvent, filter, getPaddingTop);
 			}
@@ -1911,7 +1944,7 @@ export class List<T> implements ISpliceable<T>, IDisposable {
 			const scrollBottom = scrollTop + this.view.renderHeight;
 
 			if (elementTop < scrollTop + paddingTop && viewItemBottom >= scrollBottom) {
-				// The element is already overflowing the viewport, no-op
+				// 元素已溢出视口，无需操作
 			} else if (elementTop < scrollTop + paddingTop || (viewItemBottom >= scrollBottom && elementHeight >= this.view.renderHeight)) {
 				this.view.setScrollTop(elementTop - paddingTop);
 			} else if (viewItemBottom >= scrollBottom) {
@@ -1921,8 +1954,8 @@ export class List<T> implements ISpliceable<T>, IDisposable {
 	}
 
 	/**
-	 * Returns the relative position of an element rendered in the list.
-	 * Returns `null` if the element isn't *entirely* in the visible viewport.
+	 * 返回列表中已渲染元素的相对位置。
+	 * 如果元素未完全在可见视口内，则返回 `null`。
 	 */
 	getRelativeTop(index: number, paddingTop: number = 0): number | null {
 		if (index < 0 || index >= this.length) {

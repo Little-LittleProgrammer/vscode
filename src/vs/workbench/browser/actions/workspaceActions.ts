@@ -322,16 +322,59 @@ class DuplicateWorkspaceInNewWindowAction extends Action2 {
 
 // --- Actions Registration
 
+/**
+ * 工作区操作注册
+ *
+ * VSCode 的工作区系统是其核心功能之一，它允许用户：
+ * 1. 组织相关项目：将多个相关项目文件夹组合到一个工作区中
+ * 2. 工作区特定设置：为特定项目组合定义专用设置，不影响全局设置
+ * 3. 工作区任务：定义特定于工作区的任务，如构建、测试等
+ * 4. 扩展推荐：为特定工作区推荐相关扩展
+ * 5. 项目共享：通过共享 .code-workspace 文件，团队成员可以使用相同的工作环境
+ */
+
+// 允许用户向当前工作区添加一个新的根文件夹
+// 对应命令面板中的"添加文件夹到工作区..."选项
 registerAction2(AddRootFolderAction);
+
+// 允许用户从当前工作区中移除一个根文件夹
+// 不会删除磁盘上的文件夹，只是从当前工作区中移除
 registerAction2(RemoveRootFolderAction);
+
+// 打开文件选择对话框，允许用户选择并打开一个文件
+// 通常对应"文件 > 打开文件..."菜单项
 registerAction2(OpenFileAction);
+
+// 打开文件夹选择对话框，允许用户选择并打开一个文件夹
+// 通常对应"文件 > 打开文件夹..."菜单项
+// 打开的文件夹会替换当前窗口中的内容
 registerAction2(OpenFolderAction);
+
+// 类似于 OpenFolderAction，但有特定的工作区相关处理
 registerAction2(OpenFolderViaWorkspaceAction);
+
+// 在某些平台上（如 macOS）合并了打开文件和打开文件夹的功能
+// 允许用户在同一对话框中选择打开文件或文件夹
 registerAction2(OpenFileFolderAction);
+
+// 打开工作区文件选择对话框，允许用户选择并打开一个 .code-workspace 文件
+// 通常对应"文件 > 打开工作区..."菜单项
 registerAction2(OpenWorkspaceAction);
+
+// 打开当前工作区的配置文件（.code-workspace）进行编辑
+// 允许用户直接修改工作区设置、启动任务、推荐扩展等
 registerAction2(OpenWorkspaceConfigFileAction);
+
+// 关闭当前工作区，回到空窗口状态
+// 通常对应"文件 > 关闭工作区"菜单项
 registerAction2(CloseWorkspaceAction);
+
+// 允许用户将当前工作区保存为 .code-workspace 文件
+// 对于多根工作区特别有用，可以保存当前的文件夹组合
 registerAction2(SaveWorkspaceAsAction);
+
+// 在新窗口中打开当前工作区的副本
+// 允许用户在不同窗口中处理相同的工作区内容
 registerAction2(DuplicateWorkspaceInNewWindowAction);
 
 // --- Menu Registration

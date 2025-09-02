@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *  版权所有 (c) Microsoft Corporation。保留所有权利。
+ *  根据 MIT 许可证获得许可。有关详细信息，请参阅项目根目录下的 License.txt。
  *--------------------------------------------------------------------------------------------*/
 
 import { localize, localize2 } from '../../../nls.js';
@@ -84,7 +84,7 @@ abstract class BaseOpenRecentAction extends Action2 {
 
 		let hasWorkspaces = false;
 
-		// Identify all folders and workspaces with unsaved files
+		// 标识所有包含未保存文件的文件夹和工作区
 		const dirtyFolders = new ResourceMap<boolean>();
 		const dirtyWorkspaces = new ResourceMap<IWorkspaceIdentifier>();
 		for (const dirtyWorkspace of dirtyWorkspacesAndFolders) {
@@ -96,7 +96,7 @@ abstract class BaseOpenRecentAction extends Action2 {
 			}
 		}
 
-		// Identify all recently opened folders and workspaces
+		// 标识所有最近打开的文件夹和工作区
 		const recentFolders = new ResourceMap<boolean>();
 		const recentWorkspaces = new ResourceMap<IWorkspaceIdentifier>();
 		for (const recent of recentlyOpened.workspaces) {
@@ -108,7 +108,7 @@ abstract class BaseOpenRecentAction extends Action2 {
 			}
 		}
 
-		// Fill in all known recently opened workspaces
+		// 填充所有已知的最近打开的工作区
 		const workspacePicks: IRecentlyOpenedPick[] = [];
 		for (const recent of recentlyOpened.workspaces) {
 			const isDirty = isRecentFolder(recent) ? dirtyFolders.has(recent.folderUri) : dirtyWorkspaces.has(recent.workspace.configPath);
@@ -116,7 +116,7 @@ abstract class BaseOpenRecentAction extends Action2 {
 			workspacePicks.push(this.toQuickPick(modelService, languageService, labelService, recent, isDirty));
 		}
 
-		// Fill any backup workspace that is not yet shown at the end
+		// 在末尾补充任何尚未显示的备份工作区
 		for (const dirtyWorkspaceOrFolder of dirtyWorkspacesAndFolders) {
 			if (isFolderBackupInfo(dirtyWorkspaceOrFolder) && !recentFolders.has(dirtyWorkspaceOrFolder.folderUri)) {
 				workspacePicks.push(this.toQuickPick(modelService, languageService, labelService, dirtyWorkspaceOrFolder, true));
@@ -127,7 +127,7 @@ abstract class BaseOpenRecentAction extends Action2 {
 
 		const filePicks = recentlyOpened.files.map(p => this.toQuickPick(modelService, languageService, labelService, p, false));
 
-		// focus second entry if the first recent workspace is the current workspace
+		// 如果第一个最近的工作区是当前工作区，则聚焦第二个条目
 		const firstEntry = recentlyOpened.workspaces[0];
 		const autoFocusSecondEntry: boolean = firstEntry && contextService.isCurrentWorkspace(isRecentWorkspace(firstEntry) ? firstEntry.workspace : firstEntry.folderUri);
 
@@ -147,13 +147,13 @@ abstract class BaseOpenRecentAction extends Action2 {
 			hideInput: this.isQuickNavigate(),
 			onDidTriggerItemButton: async context => {
 
-				// Remove
+				// 移除
 				if (context.button === this.removeFromRecentlyOpened) {
 					await workspacesService.removeRecentlyOpened([context.item.resource]);
 					context.removeItem();
 				}
 
-				// Dirty Folder/Workspace
+				// 脏文件夹/工作区
 				else if (context.button === this.dirtyRecentlyOpenedFolder || context.button === this.dirtyRecentlyOpenedWorkspace) {
 					const isDirtyWorkspace = context.button === this.dirtyRecentlyOpenedWorkspace;
 					const { confirmed } = await dialogService.confirm({
@@ -165,7 +165,7 @@ abstract class BaseOpenRecentAction extends Action2 {
 					if (confirmed) {
 						hostService.openWindow(
 							[context.item.openable], {
-							remoteAuthority: context.item.remoteAuthority || null // local window if remoteAuthority is not set or can not be deducted from the openable
+							remoteAuthority: context.item.remoteAuthority || null // 如果 remoteAuthority 未设置或无法从 openable 推断，则为本地窗口
 						});
 						quickInputService.cancel();
 					}
@@ -177,7 +177,7 @@ abstract class BaseOpenRecentAction extends Action2 {
 			return hostService.openWindow([pick.openable], {
 				forceNewWindow: keyMods?.ctrlCmd,
 				forceReuseWindow: keyMods?.alt,
-				remoteAuthority: pick.remoteAuthority || null // local window if remoteAuthority is not set or can not be deducted from the openable
+				remoteAuthority: pick.remoteAuthority || null // 如果 remoteAuthority 未设置或无法从 openable 推断，则为本地窗口
 			});
 		}
 	}
@@ -189,7 +189,7 @@ abstract class BaseOpenRecentAction extends Action2 {
 		let resource: URI | undefined;
 		let isWorkspace = false;
 
-		// Folder
+		// 文件夹
 		if (isRecentFolder(recent)) {
 			resource = recent.folderUri;
 			iconClasses = getIconClasses(modelService, languageService, resource, FileKind.FOLDER);
@@ -197,7 +197,7 @@ abstract class BaseOpenRecentAction extends Action2 {
 			fullLabel = recent.label || labelService.getWorkspaceLabel(resource, { verbose: Verbosity.LONG });
 		}
 
-		// Workspace
+		// 工作区
 		else if (isRecentWorkspace(recent)) {
 			resource = recent.workspace.configPath;
 			iconClasses = getIconClasses(modelService, languageService, resource, FileKind.ROOT_FOLDER);
@@ -206,7 +206,7 @@ abstract class BaseOpenRecentAction extends Action2 {
 			isWorkspace = true;
 		}
 
-		// File
+		// 文件
 		else {
 			resource = recent.fileUri;
 			iconClasses = getIconClasses(modelService, languageService, resource, FileKind.FILE);
@@ -267,7 +267,7 @@ class QuickPickRecentAction extends BaseOpenRecentAction {
 			id: 'workbench.action.quickOpenRecent',
 			title: localize2('quickOpenRecent', 'Quick Open Recent...'),
 			category: Categories.File,
-			f1: false // hide quick pickers from command palette to not confuse with the other entry that shows a input field
+			f1: false // 从命令面板隐藏快速选择器，以免与显示输入字段的其他条目混淆
 		});
 	}
 
@@ -411,6 +411,7 @@ class BlurAction extends Action2 {
 }
 
 // --- Actions Registration
+// --- 动作注册
 
 registerAction2(NewWindowAction);
 registerAction2(ToggleFullScreenAction);
@@ -421,6 +422,7 @@ registerAction2(ShowAboutDialogAction);
 registerAction2(BlurAction);
 
 // --- Commands/Keybindings Registration
+// --- 命令/快捷键注册
 
 const recentFilesPickerContext = ContextKeyExpr.and(inQuickPickContext, ContextKeyExpr.has(inRecentFilesPickerContextKey));
 
@@ -452,6 +454,7 @@ CommandsRegistry.registerCommand('workbench.action.toggleConfirmBeforeClose', ac
 });
 
 // --- Menu Registration
+// --- 菜单注册
 
 MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
 	group: 'z_ConfirmClose',

@@ -307,7 +307,7 @@ export abstract class Layout extends Disposable implements IWorkbenchLayoutServi
 		// 服务
 		this.environmentService = accessor.get(IBrowserWorkbenchEnvironmentService); // 环境服务：提供当前运行环境信息，如URL、命令行参数、特性标志等
 		this.configurationService = accessor.get(IConfigurationService); // 配置服务：管理用户设置、工作区设置和默认设置的读取和更新
-		this.hostService = accessor.get(IHostService); // 主机服务：提供窗口操作、焦点管理、窗口状态控制等功能
+		this.hostService = accessor.get(IHostService);
 		this.contextService = accessor.get(IWorkspaceContextService); // 工作区上下文服务：管理当前工作区信息、文件夹、工作区类型等
 		this.storageService = accessor.get(IStorageService); // 存储服务：提供持久化存储功能，保存用户数据、状态信息等
 		this.workingCopyBackupService = accessor.get(IWorkingCopyBackupService); // 工作副本备份服务：管理未保存文件的自动备份和恢复
