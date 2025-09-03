@@ -71,7 +71,7 @@ function hasExpandedRootChild(tree: WorkbenchCompressibleAsyncDataTree<ExplorerI
 }
 
 /**
- * Whether or not any of the nodes in the tree are expanded
+ * 树中是否有任何节点被展开
  */
 function hasExpandedNode(tree: WorkbenchCompressibleAsyncDataTree<ExplorerItem | ExplorerItem[], ExplorerItem, FuzzyScore>, treeInput: ExplorerItem[]): boolean {
 	for (const folder of treeInput) {
@@ -98,7 +98,7 @@ export function getContext(focus: ExplorerItem[], selection: ExplorerItem[], res
 	let focusedStat: ExplorerItem | undefined;
 	focusedStat = focus.length ? focus[0] : undefined;
 
-	// If we are respecting multi-select and we have a multi-selection we ignore focus as we want to act on the selection
+	// 如果我们尊重多选并且有多选，我们会忽略焦点，因为我们想对选择进行操作
 	if (respectMultiSelection && selection.length > 1) {
 		focusedStat = undefined;
 	}
@@ -116,7 +116,7 @@ export function getContext(focus: ExplorerItem[], selection: ExplorerItem[], res
 			if (stat === focusedStat) {
 				selectedStats.push(stat);
 			}
-			// Ignore stats which are selected but are part of the same compact node as the focused stat
+			// 忽略那些被选中但属于与焦点统计相同的压缩节点的统计
 			continue;
 		}
 
@@ -266,12 +266,12 @@ export class ExplorerView extends ViewPane implements IExplorerView {
 		return ExplorerResourceCut.bindTo(this.contextKeyService);
 	}
 
-	// Split view methods
+	// 分割视图方法
 
 	protected override renderHeader(container: HTMLElement): void {
 		super.renderHeader(container);
 
-		// Expand on drag over
+		// 拖动时展开
 		this.dragHandler = new DelayedDragHandler(container, () => this.setExpanded(true));
 
 		const titleElement = container.querySelector('.title') as HTMLElement;
@@ -304,29 +304,29 @@ export class ExplorerView extends ViewPane implements IExplorerView {
 			this._onDidChangeTitleArea.fire();
 		}));
 
-		// Update configuration
+		// 更新配置
 		this.onConfigurationUpdated(undefined);
 
-		// When the explorer viewer is loaded, listen to changes to the editor input
+		// 当资源管理器查看器加载时，监听编辑器输入的变化
 		this._register(this.editorService.onDidActiveEditorChange(() => {
 			this.selectActiveFile();
 		}));
 
-		// Also handle configuration updates
+		// 同时处理配置更新
 		this._register(this.configurationService.onDidChangeConfiguration(e => this.onConfigurationUpdated(e)));
 
 		this._register(this.onDidChangeBodyVisibility(async visible => {
 			if (visible) {
-				// Always refresh explorer when it becomes visible to compensate for missing file events #126817
+				// 当资源管理器变为可见时总是刷新，以补偿缺失的文件事件 #126817
 				await this.setTreeInput();
-				// Update the collapse / expand  button state
+				// 更新折叠/展开按钮状态
 				this.updateAnyCollapsedContext();
-				// Find resource to focus from active editor input if set
+				// 如果设置了，从活动编辑器输入中查找要聚焦的资源
 				this.selectActiveFile(true);
 			}
 		}));
 
-		// Support for paste of files into explorer
+		// 支持将文件粘贴到资源管理器
 		this._register(DOM.addDisposableListener(DOM.getWindow(this.container), DOM.EventType.PASTE, async event => {
 			if (!this.hasFocus() || this.readonlyContext.get()) {
 				return;
@@ -373,7 +373,7 @@ export class ExplorerView extends ViewPane implements IExplorerView {
 	}
 
 	isItemVisible(item: ExplorerItem): boolean {
-		// If filter is undefined it means the tree hasn't been rendered yet, so nothing is visible
+		// 如果过滤器未定义，则表示树尚未渲染，因此没有任何内容可见
 		if (!this.filter) {
 			return false;
 		}
@@ -420,7 +420,7 @@ export class ExplorerView extends ViewPane implements IExplorerView {
 				const focus = this.tree.getFocus();
 				const selection = this.tree.getSelection();
 				if (focus.length === 1 && this.uriIdentityService.extUri.isEqual(focus[0].resource, activeFile) && selection.length === 1 && this.uriIdentityService.extUri.isEqual(selection[0].resource, activeFile)) {
-					// No action needed, active file is already focused and selected
+					// 无需操作，活动文件已经被聚焦和选中
 					return;
 				}
 				return this.explorerService.select(activeFile, reveal);
@@ -447,6 +447,7 @@ export class ExplorerView extends ViewPane implements IExplorerView {
 
 		const getFileNestingSettings = (item?: ExplorerItem) => this.configurationService.getValue<IFilesConfiguration>({ resource: item?.root.resource }).explorer.fileNesting;
 
+		// 处理文件资源管理器交互的核心组件
 		this.tree = this.instantiationService.createInstance(WorkbenchCompressibleAsyncDataTree<ExplorerItem | ExplorerItem[], ExplorerItem, FuzzyScore>, 'FileExplorer', container, new ExplorerDelegate(), new ExplorerCompressionDelegate(), [this.renderer],
 			this.instantiationService.createInstance(ExplorerDataSource, this.filter, this.findProvider), {
 			compressionEnabled: isCompressionEnabled(),
@@ -502,30 +503,30 @@ export class ExplorerView extends ViewPane implements IExplorerView {
 		this._register(this.tree);
 		this._register(this.themeService.onDidColorThemeChange(() => this.tree.rerender()));
 
-		// Bind configuration
+		// 绑定配置
 		const onDidChangeCompressionConfiguration = Event.filter(this.configurationService.onDidChangeConfiguration, e => e.affectsConfiguration('explorer.compactFolders'));
 		this._register(onDidChangeCompressionConfiguration(_ => this.tree.updateOptions({ compressionEnabled: isCompressionEnabled() })));
 
-		// Bind context keys
+		// 绑定上下文键
 		FilesExplorerFocusedContext.bindTo(this.tree.contextKeyService);
 		ExplorerFocusedContext.bindTo(this.tree.contextKeyService);
 
-		// Update resource context based on focused element
+		// 根据焦点元素更新资源上下文
 		this._register(this.tree.onDidChangeFocus(e => this.onFocusChanged(e.elements)));
 		this.onFocusChanged([]);
-		// Open when selecting via keyboard
+		// 通过键盘选择时打开
 		this._register(this.tree.onDidOpen(async e => {
 			const element = e.element;
 			if (!element) {
 				return;
 			}
-			// Do not react if the user is expanding selection via keyboard.
-			// Check if the item was previously also selected, if yes the user is simply expanding / collapsing current selection #66589.
+			// 如果用户通过键盘扩展选择，则不要做出反应。
+			// 检查该项目之前是否也被选中，如果是，则用户只是在展开/折叠当前选择 #66589。
 			const shiftDown = DOM.isKeyboardEvent(e.browserEvent) && e.browserEvent.shiftKey;
 			if (!shiftDown) {
 				if (element.isDirectory || this.explorerService.isEditable(undefined)) {
-					// Do not react if user is clicking on explorer items while some are being edited #70276
-					// Do not react if clicking on directories
+					// 当用户在某些项目被编辑时点击资源管理器项目，不要做出反应 #70276
+					// 点击目录时不要做出反应
 					return;
 				}
 				this.telemetryService.publicLog2<WorkbenchActionExecutedEvent, WorkbenchActionExecutedClassification>('workbenchActionExecuted', { id: 'workbench.files.openFile', from: 'explorer' });
@@ -553,28 +554,28 @@ export class ExplorerView extends ViewPane implements IExplorerView {
 				const navigationControllers = this.renderer.getCompressedNavigationController(element instanceof Array ? element[0] : element);
 				navigationControllers?.forEach(controller => controller.updateCollapsed(e.node.collapsed));
 			}
-			// Update showing expand / collapse button
+			// 更新显示展开/折叠按钮
 			this.updateAnyCollapsedContext();
 		}));
 
 		this.updateAnyCollapsedContext();
 
 		this._register(this.tree.onMouseDblClick(e => {
-			// If empty space is clicked, and not scrolling by page enabled #173261
+			// 如果点击空白区域，且未启用按页滚动 #173261
 			const scrollingByPage = this.configurationService.getValue<boolean>('workbench.list.scrollByPage');
 			if (e.element === null && !scrollingByPage) {
-				// click in empty area -> create a new file #116676
+				// 点击空白区域 -> 创建新文件 #116676
 				this.commandService.executeCommand(NEW_FILE_COMMAND_ID);
 			}
 		}));
 
-		// save view state
+		// 保存视图状态
 		this._register(this.storageService.onWillSaveState(() => {
 			this.storeTreeViewState();
 		}));
 	}
 
-	// React on events
+	// 对事件做出反应
 
 	private onConfigurationUpdated(event: IConfigurationChangeEvent | undefined): void {
 		if (!event || event.affectsConfiguration('explorer.autoReveal')) {
@@ -582,7 +583,7 @@ export class ExplorerView extends ViewPane implements IExplorerView {
 			this._autoReveal = configuration?.explorer?.autoReveal;
 		}
 
-		// Push down config updates to components of viewer
+		// 将配置更新推送到查看器的组件
 		if (event && (event.affectsConfiguration('explorer.decorations.colors') || event.affectsConfiguration('explorer.decorations.badges'))) {
 			this.refresh(true);
 		}
@@ -603,6 +604,7 @@ export class ExplorerView extends ViewPane implements IExplorerView {
 		this.rootContext.set(!!stat && stat.isRoot);
 
 		if (resource) {
+			// 会通过editorResolverService解析出应该使用的编辑器类型，如果是 text 类型，则打开 monaco 编辑器
 			const overrides = resource ? this.editorResolverService.getEditors(resource).map(editor => editor.id) : [];
 			this.availableEditorIdsContext.set(overrides.join(','));
 		} else {

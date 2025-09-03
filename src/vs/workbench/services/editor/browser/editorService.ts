@@ -96,7 +96,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 
 	private registerListeners(): void {
 
-		// Editor & group changes
+		// 编辑器和组变化
 		if (this.editorGroupsContainer === this.editorGroupService.mainPart || this.editorGroupsContainer === this.editorGroupService) {
 			this.editorGroupService.whenReady.then(() => this.onEditorGroupsReady());
 		} else {
@@ -106,33 +106,33 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 		this._register(this.editorGroupsContainer.onDidAddGroup(group => this.registerGroupListeners(group as IEditorGroupView)));
 		this._register(this.editorsObserver.onDidMostRecentlyActiveEditorsChange(() => this._onDidMostRecentlyActiveEditorsChange.fire()));
 
-		// Out of workspace file watchers
+		// 工作区外文件监视器
 		this._register(this.onDidVisibleEditorsChange(() => this.handleVisibleEditorsChange()));
 
-		// File changes & operations
-		// Note: there is some duplication with the two file event handlers- Since we cannot always rely on the disk events
-		// carrying all necessary data in all environments, we also use the file operation events to make sure operations are handled.
-		// In any case there is no guarantee if the local event is fired first or the disk one. Thus, code must handle the case
-		// that the event ordering is random as well as might not carry all information needed.
+		// 文件变化和操作
+		// 注意：这两个文件事件处理程序有一些重复 - 由于我们不能总是依赖所有环境中的磁盘事件
+		// 携带所有必要的数据，我们还使用文件操作事件来确保处理操作。
+		// 在任何情况下，都不能保证本地事件先于磁盘事件触发，反之亦然。因此，代码必须处理
+		// 事件顺序是随机的，并且可能不携带所有需要的信息。
 		this._register(this.fileService.onDidRunOperation(e => this.onDidRunFileOperation(e)));
 		this._register(this.fileService.onDidFilesChange(e => this.onDidFilesChange(e)));
 
-		// Configuration
+		// 配置
 		this._register(this.configurationService.onDidChangeConfiguration(e => this.onConfigurationUpdated(e)));
 	}
 
-	//#region Editor & group event handlers
+	//#region 编辑器和组事件处理程序
 
 	private lastActiveEditor: EditorInput | undefined = undefined;
 
 	private onEditorGroupsReady(): void {
 
-		// Register listeners to each opened group
+		// 为每个已打开的组注册监听器
 		for (const group of this.editorGroupsContainer.groups) {
 			this.registerGroupListeners(group as IEditorGroupView);
 		}
 
-		// Fire initial set of editor events if there is an active editor
+		// 如果有活动编辑器，触发初始编辑器事件集
 		if (this.activeEditor) {
 			this.doHandleActiveEditorChangeEvent();
 			this._onDidVisibleEditorsChange.fire();
@@ -141,11 +141,11 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 
 	private handleActiveEditorChange(group: IEditorGroup): void {
 		if (group !== this.editorGroupsContainer.activeGroup) {
-			return; // ignore if not the active group
+			return; // 如果不是活动组则忽略
 		}
 
 		if (!this.lastActiveEditor && !group.activeEditor) {
-			return; // ignore if we still have no active editor
+			return; // 如果我们仍然没有活动编辑器则忽略
 		}
 
 		this.doHandleActiveEditorChangeEvent();
@@ -153,11 +153,11 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 
 	private doHandleActiveEditorChangeEvent(): void {
 
-		// Remember as last active
+		// 记住为最后活动的
 		const activeGroup = this.editorGroupsContainer.activeGroup;
 		this.lastActiveEditor = activeGroup.activeEditor ?? undefined;
 
-		// Fire event to outside parties
+		// 向外部触发事件
 		this._onDidActiveEditorChange.fire();
 	}
 
@@ -192,7 +192,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 
 	//#endregion
 
-	//#region Visible Editors Change: Install file watchers for out of workspace resources that became visible
+	//#region 可见编辑器变化：为变为可见的工作区外资源安装文件监视器
 
 	private readonly activeOutOfWorkspaceWatchers = new ResourceMap<IDisposable>();
 
@@ -212,7 +212,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 			}
 		}
 
-		// Handle no longer visible out of workspace resources
+		// 处理不再可见的工作区外资源
 		for (const resource of this.activeOutOfWorkspaceWatchers.keys()) {
 			if (!visibleOutOfWorkspaceResources.has(resource)) {
 				dispose(this.activeOutOfWorkspaceWatchers.get(resource));
@@ -220,7 +220,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 			}
 		}
 
-		// Handle newly visible out of workspace resources
+		// 处理新可见的工作区外资源
 		for (const resource of visibleOutOfWorkspaceResources.keys()) {
 			if (!this.activeOutOfWorkspaceWatchers.get(resource)) {
 				const disposable = this.fileService.watch(resource);
@@ -231,16 +231,16 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 
 	//#endregion
 
-	//#region File Changes: Move & Deletes to move or close opend editors
+	//#region 文件变化：移动和删除以移动或关闭已打开的编辑器
 
 	private async onDidRunFileOperation(e: FileOperationEvent): Promise<void> {
 
-		// Handle moves specially when file is opened
+		// 当文件已打开时特别处理移动操作
 		if (e.isOperation(FileOperation.MOVE)) {
 			this.handleMovedFile(e.resource, e.target.resource);
 		}
 
-		// Handle deletes
+		// 处理删除
 		if (e.isOperation(FileOperation.DELETE) || e.isOperation(FileOperation.MOVE)) {
 			this.handleDeletedFile(e.resource, false, e.target ? e.target.resource : undefined);
 		}
@@ -259,22 +259,22 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 			for (const editor of group.editors) {
 				const resource = editor.resource;
 				if (!resource || !this.uriIdentityService.extUri.isEqualOrParent(resource, source)) {
-					continue; // not matching our resource
+					continue; // 与我们的资源不匹配
 				}
 
-				// Determine new resulting target resource
+				// 确定新的目标资源
 				let targetResource: URI;
 				if (this.uriIdentityService.extUri.isEqual(source, resource)) {
-					targetResource = target; // file got moved
+					targetResource = target; // 文件被移动
 				} else {
 					const index = indexOfPath(resource.path, source.path, this.uriIdentityService.extUri.ignorePathCasing(resource));
-					targetResource = joinPath(target, resource.path.substr(index + source.path.length + 1)); // parent folder got moved
+					targetResource = joinPath(target, resource.path.substr(index + source.path.length + 1)); // 父文件夹被移动
 				}
 
-				// Delegate rename() to editor instance
+				// 委托重命名()给编辑器实例
 				const moveResult = await editor.rename(group.id, targetResource);
 				if (!moveResult) {
-					return; // not target - ignore
+					return; // 无目标 - 忽略
 				}
 
 				const optionOverrides = {
@@ -285,7 +285,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 					inactive: !group.isActive(editor)
 				};
 
-				// Construct a replacement with our extra options mixed in
+				// 构造一个替换，混合我们的额外选项
 				if (isEditorInput(moveResult.editor)) {
 					replacements.push({
 						editor,
@@ -309,7 +309,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 				}
 			}
 
-			// Apply replacements
+			// 应用替换
 			if (replacements.length) {
 				this.replaceEditors(replacements, group);
 			}
@@ -327,7 +327,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 		if (typeof configuration.workbench?.editor?.closeOnFileDelete === 'boolean') {
 			this.closeOnFileDelete = configuration.workbench.editor.closeOnFileDelete;
 		} else {
-			this.closeOnFileDelete = false; // default
+			this.closeOnFileDelete = false; // 默认
 		}
 	}
 
@@ -339,14 +339,13 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 					return;
 				}
 
-				// Handle deletes in opened editors depending on:
-				// - we close any editor when `closeOnFileDelete: true`
-				// - we close any editor when the delete occurred from within VSCode
+				// 根据以下条件处理已打开编辑器中的删除：
+				// - 当 `closeOnFileDelete: true` 时关闭任何编辑器
+				// - 当删除是从 VSCode 内部发生时关闭任何编辑器
 				if (this.closeOnFileDelete || !isExternal) {
 
-					// Do NOT close any opened editor that matches the resource path (either equal or being parent) of the
-					// resource we move to (movedTo). Otherwise we would close a resource that has been renamed to the same
-					// path but different casing.
+					// 不要关闭任何与我们移动到的资源路径（movedTo）匹配的已打开编辑器（无论是相等还是作为父级）。
+					// 否则，我们会关闭已重命名为相同路径但大小写不同的资源。
 					if (movedTo && this.uriIdentityService.extUri.isEqualOrParent(resource, movedTo)) {
 						return;
 					}
@@ -362,12 +361,11 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 						return;
 					}
 
-					// We have received reports of users seeing delete events even though the file still
-					// exists (network shares issue: https://github.com/microsoft/vscode/issues/13665).
-					// Since we do not want to close an editor without reason, we have to check if the
-					// file is really gone and not just a faulty file event.
-					// This only applies to external file events, so we need to check for the isExternal
-					// flag.
+					// 我们收到了用户报告，即使文件仍然存在，他们也看到了删除事件
+					// （网络共享问题：https://github.com/microsoft/vscode/issues/13665）。
+					// 由于我们不想无缘无故地关闭编辑器，我们必须检查文件是否
+					// 真的不存在，而不仅仅是错误的文件事件。
+					// 这仅适用于外部文件事件，因此我们需要检查 isExternal 标志。
 					let exists = false;
 					if (isExternal && this.fileService.hasProvider(resource)) {
 						await timeout(100);
@@ -411,7 +409,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 
 	//#endregion
 
-	//#region Editor accessors
+	//#region 编辑器访问器
 
 	private readonly editorsObserver: EditorsObserver;
 
@@ -458,7 +456,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 	getEditors(order: EditorsOrder, options?: { excludeSticky?: boolean }): IEditorIdentifier[] {
 		switch (order) {
 
-			// MRU
+			// 最近使用
 			case EditorsOrder.MOST_RECENTLY_ACTIVE:
 				if (options?.excludeSticky) {
 					return this.editorsObserver.editors.filter(({ groupId, editor }) => !this.editorGroupsContainer.getGroup(groupId)?.isSticky(editor));
@@ -466,7 +464,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 
 				return this.editorsObserver.editors;
 
-			// Sequential
+			// 顺序
 			case EditorsOrder.SEQUENTIAL: {
 				const editors: IEditorIdentifier[] = [];
 
@@ -541,15 +539,15 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 			preferredGroup = optionsOrPreferredGroup;
 		}
 
-		// Resolve override unless disabled
+		// 解析覆盖，除非禁用
 		if (!isEditorInput(editor)) {
 			const resolvedEditor = await this.editorResolverService.resolveEditor(editor, preferredGroup);
 
 			if (resolvedEditor === ResolvedStatus.ABORT) {
-				return; // skip editor if override is aborted
+				return; // 如果覆盖被中止，则跳过编辑器
 			}
 
-			// We resolved an editor to use
+			// 我们解析了要使用的编辑器
 			if (isEditorInputWithOptionsAndGroup(resolvedEditor)) {
 				typedEditor = resolvedEditor.editor;
 				options = resolvedEditor.options;
@@ -557,12 +555,12 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 			}
 		}
 
-		// Override is disabled or did not apply: fallback to default
+		// 覆盖被禁用或未应用：回退到默认
 		if (!typedEditor) {
 			typedEditor = isEditorInput(editor) ? editor : await this.textEditorService.resolveTextEditor(editor);
 		}
 
-		// If group still isn't defined because of a disabled override we resolve it
+		// 如果由于禁用的覆盖而仍未定义组，则解析它
 		if (!group) {
 			let activation: EditorActivation | undefined = undefined;
 			const findGroupResult = this.instantiationService.invokeFunction(findGroup, { editor: typedEditor, options }, preferredGroup);
@@ -572,7 +570,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 				([group, activation] = findGroupResult);
 			}
 
-			// Mixin editor group activation if returned
+			// 如果返回了编辑器组激活，则混入
 			if (activation) {
 				options = { ...options, activation };
 			}
@@ -590,9 +588,8 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 	openEditors(editors: Array<EditorInputWithOptions | IUntypedEditorInput>, group?: PreferredGroup, options?: IOpenEditorsOptions): Promise<IEditorPane[]>;
 	async openEditors(editors: Array<EditorInputWithOptions | IUntypedEditorInput>, preferredGroup?: PreferredGroup, options?: IOpenEditorsOptions): Promise<IEditorPane[]> {
 
-		// Pass all editors to trust service to determine if
-		// we should proceed with opening the editors if we
-		// are asked to validate trust.
+		// 将所有编辑器传递给信任服务，以确定
+		// 如果要求验证信任，我们是否应该继续打开编辑器。
 		if (options?.validateTrust) {
 			const editorsTrusted = await this.handleWorkspaceTrust(editors);
 			if (!editorsTrusted) {
@@ -600,33 +597,33 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 			}
 		}
 
-		// Find target groups for editors to open
+		// 为要打开的编辑器查找目标组
 		const mapGroupToTypedEditors = new Map<IEditorGroup, Array<EditorInputWithOptions>>();
 		for (const editor of editors) {
 			let typedEditor: EditorInputWithOptions | undefined = undefined;
 			let group: IEditorGroup | undefined = undefined;
 
-			// Resolve override unless disabled
+			// 解析覆盖，除非禁用
 			if (!isEditorInputWithOptions(editor)) {
 				const resolvedEditor = await this.editorResolverService.resolveEditor(editor, preferredGroup);
 
 				if (resolvedEditor === ResolvedStatus.ABORT) {
-					continue; // skip editor if override is aborted
+					continue; // 如果覆盖被中止，则跳过编辑器
 				}
 
-				// We resolved an editor to use
+				// 我们解析了要使用的编辑器
 				if (isEditorInputWithOptionsAndGroup(resolvedEditor)) {
 					typedEditor = resolvedEditor;
 					group = resolvedEditor.group;
 				}
 			}
 
-			// Override is disabled or did not apply: fallback to default
+			// 覆盖被禁用或未应用：回退到默认
 			if (!typedEditor) {
 				typedEditor = isEditorInputWithOptions(editor) ? editor : { editor: await this.textEditorService.resolveTextEditor(editor), options: editor.options };
 			}
 
-			// If group still isn't defined because of a disabled override we resolve it
+			// 如果由于禁用的覆盖而仍未定义组，则解析它
 			if (!group) {
 				const findGroupResult = this.instantiationService.invokeFunction(findGroup, typedEditor, preferredGroup);
 				if (findGroupResult instanceof Promise) {
@@ -636,7 +633,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 				}
 			}
 
-			// Update map of groups to editors
+			// 更新组到编辑器的映射
 			let targetGroupEditors = mapGroupToTypedEditors.get(group);
 			if (!targetGroupEditors) {
 				targetGroupEditors = [];
@@ -646,7 +643,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 			targetGroupEditors.push(typedEditor);
 		}
 
-		// Open in target groups
+		// 在目标组中打开
 		const result: Promise<IEditorPane | undefined>[] = [];
 		for (const [group, editors] of mapGroupToTypedEditors) {
 			result.push(group.openEditors(editors));
@@ -810,12 +807,10 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 		const resource = URI.isUri(arg1) ? arg1 : arg1.resource;
 		const typeId = URI.isUri(arg1) ? undefined : arg1.typeId;
 
-		// Do a quick check for the resource via the editor observer
-		// which is a very efficient way to find an editor by resource.
-		// However, we can only do that unless we are asked to find an
-		// editor on the secondary side of a side by side editor, because
-		// the editor observer provides fast lookups only for primary
-		// editors.
+		// 通过编辑器观察器对资源进行快速检查
+		// 这是通过资源查找编辑器的一种非常高效的方式。
+		// 然而，我们只能在不需要查找并排编辑器的次要侧面的编辑器时这样做，
+		// 因为编辑器观察器仅为主要编辑器提供快速查找。
 		if (options?.supportSideBySide !== SideBySideEditor.ANY && options?.supportSideBySide !== SideBySideEditor.SECONDARY) {
 			if (!this.editorsObserver.hasEditors(resource)) {
 				if (URI.isUri(arg1) || isUndefined(arg2)) {
@@ -826,7 +821,7 @@ export class EditorService extends Disposable implements EditorServiceImpl {
 			}
 		}
 
-		// Search only in specific group
+		// 仅在特定组中搜索
 		if (!isUndefined(arg2)) {
 			const targetGroup = typeof arg2 === 'number' ? this.editorGroupsContainer.getGroup(arg2) : arg2;
 

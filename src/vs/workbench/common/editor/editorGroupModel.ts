@@ -58,16 +58,15 @@ export function isSerializedEditorGroupModel(group?: unknown): group is ISeriali
 export interface IMatchOptions {
 
 	/**
-	 * Whether to consider a side by side editor as matching.
-	 * By default, side by side editors will not be considered
-	 * as matching, even if the editor is opened in one of the sides.
+	 * 是否将并排编辑器视为匹配项。
+	 * 默认情况下，并排编辑器不会被视为
+	 * 匹配项，即使编辑器在其中一侧打开。
 	 */
 	readonly supportSideBySide?: SideBySideEditor.ANY | SideBySideEditor.BOTH;
 
 	/**
-	 * Only consider an editor to match when the
-	 * `candidate === editor` but not when
-	 * `candidate.matches(editor)`.
+	 * 仅当 `candidate === editor` 时才认为编辑器匹配，
+	 * 而不是当 `candidate.matches(editor)` 时。
 	 */
 	readonly strictEquals?: boolean;
 }
@@ -75,20 +74,19 @@ export interface IMatchOptions {
 export interface IGroupModelChangeEvent {
 
 	/**
-	 * The kind of change that occurred in the group model.
+	 * 在组模型中发生的变更类型。
 	 */
 	readonly kind: GroupModelChangeKind;
 
 	/**
-	 * Only applies when editors change providing
-	 * access to the editor the event is about.
+	 * 仅在编辑器变更时适用，
+	 * 提供对事件相关编辑器的访问。
 	 */
 	readonly editor?: EditorInput;
 
 	/**
-	 * Only applies when editors change providing
-	 * access to the index of the editor the event
-	 * is about.
+	 * 仅在编辑器变更时适用，
+	 * 提供对事件相关编辑器索引的访问。
 	 */
 	readonly editorIndex?: number;
 }
@@ -120,9 +118,9 @@ export interface IGroupEditorMoveEvent extends IGroupEditorChangeEvent {
 	readonly kind: GroupModelChangeKind.EDITOR_MOVE;
 
 	/**
-	 * Signifies the index the editor is moving from.
-	 * `editorIndex` will contain the index the editor
-	 * is moving to.
+	 * 表示编辑器移动的起始索引。
+	 * `editorIndex` 将包含编辑器
+	 * 移动的目标索引。
 	 */
 	readonly oldEditorIndex: number;
 }
@@ -138,16 +136,16 @@ export interface IGroupEditorCloseEvent extends IGroupEditorChangeEvent {
 	readonly kind: GroupModelChangeKind.EDITOR_CLOSE;
 
 	/**
-	 * Signifies the context in which the editor
-	 * is being closed. This allows for understanding
-	 * if a replace or reopen is occurring
+	 * 表示编辑器关闭的上下文。
+	 * 这有助于理解是否发生了
+	 * 替换或重新打开操作
 	 */
 	readonly context: EditorCloseContext;
 
 	/**
-	 * Signifies whether or not the closed editor was
-	 * sticky. This is necessary becasue state is lost
-	 * after closing.
+	 * 表示已关闭的编辑器是否为固定状态。
+	 * 这是必要的，因为状态会在
+	 * 关闭后丢失。
 	 */
 	readonly sticky: boolean;
 }
@@ -203,9 +201,9 @@ export class EditorGroupModel extends Disposable implements IEditorGroupModel {
 
 	private static IDS = 0;
 
-	//#region events
+	//#region 事件
 
-	private readonly _onDidModelChange = this._register(new Emitter<IGroupModelChangeEvent>({ leakWarningThreshold: 500 /* increased for users with hundreds of inputs opened */ }));
+	private readonly _onDidModelChange = this._register(new Emitter<IGroupModelChangeEvent>({ leakWarningThreshold: 500 /* 为拥有数百个已打开输入的用户增加阈值 */ }));
 	readonly onDidModelChange = this._onDidModelChange.event;
 
 	//#endregion
@@ -220,15 +218,15 @@ export class EditorGroupModel extends Disposable implements IEditorGroupModel {
 
 	private locked = false;
 
-	private selection: EditorInput[] = [];					// editors in selected state, first one is active
+	private selection: EditorInput[] = [];					// 处于选中状态的编辑器，第一个是活动编辑器
 
 	private get active(): EditorInput | null {
 		return this.selection[0] ?? null;
 	}
 
-	private preview: EditorInput | null = null; 			// editor in preview state
-	private sticky = -1;									// index of first editor in sticky state
-	private readonly transient = new Set<EditorInput>(); 	// editors in transient state
+	private preview: EditorInput | null = null; 			// 处于预览状态的编辑器
+	private sticky = -1;									// 第一个固定状态编辑器的索引
+	private readonly transient = new Set<EditorInput>(); 	// 处于临时状态的编辑器
 
 	private editorOpenPositioning: ('left' | 'right' | 'first' | 'last') | undefined;
 	private focusRecentEditorAfterClose: boolean | undefined;
@@ -276,12 +274,12 @@ export class EditorGroupModel extends Disposable implements IEditorGroupModel {
 
 		if (options?.excludeSticky) {
 
-			// MRU: need to check for index on each
+			// MRU（最近使用）：需要检查每个的索引
 			if (order === EditorsOrder.MOST_RECENTLY_ACTIVE) {
 				return editors.filter(editor => !this.isSticky(editor));
 			}
 
-			// Sequential: simply start after sticky index
+			// 顺序：只需从固定索引之后开始
 			return editors.slice(this.sticky + 1);
 		}
 
@@ -317,54 +315,54 @@ export class EditorGroupModel extends Disposable implements IEditorGroupModel {
 			const newEditor = candidate;
 			const indexOfActive = this.indexOf(this.active);
 
-			// Insert into specific position
+			// 插入到特定位置
 			let targetIndex: number;
 			if (options && typeof options.index === 'number') {
 				targetIndex = options.index;
 			}
 
-			// Insert to the BEGINNING
+			// 插入到开头
 			else if (this.editorOpenPositioning === EditorOpenPositioning.FIRST) {
 				targetIndex = 0;
 
-				// Always make sure targetIndex is after sticky editors
-				// unless we are explicitly told to make the editor sticky
+				// 始终确保目标索引在固定编辑器之后
+				// 除非我们明确指示将编辑器设为固定状态
 				if (!makeSticky && this.isSticky(targetIndex)) {
 					targetIndex = this.sticky + 1;
 				}
 			}
 
-			// Insert to the END
+			// 插入到末尾
 			else if (this.editorOpenPositioning === EditorOpenPositioning.LAST) {
 				targetIndex = this.editors.length;
 			}
 
-			// Insert to LEFT or RIGHT of active editor
+			// 插入到活动编辑器的左侧或右侧
 			else {
 
-				// Insert to the LEFT of active editor
+				// 插入到活动编辑器的左侧
 				if (this.editorOpenPositioning === EditorOpenPositioning.LEFT) {
 					if (indexOfActive === 0 || !this.editors.length) {
-						targetIndex = 0; // to the left becoming first editor in list
+						targetIndex = 0; // 向左成为列表中的第一个编辑器
 					} else {
-						targetIndex = indexOfActive; // to the left of active editor
+						targetIndex = indexOfActive; // 在活动编辑器的左侧
 					}
 				}
 
-				// Insert to the RIGHT of active editor
+				// 插入到活动编辑器的右侧
 				else {
 					targetIndex = indexOfActive + 1;
 				}
 
-				// Always make sure targetIndex is after sticky editors
-				// unless we are explicitly told to make the editor sticky
+				// 始终确保目标索引在固定编辑器之后
+				// 除非我们明确指示将编辑器设为固定状态
 				if (!makeSticky && this.isSticky(targetIndex)) {
 					targetIndex = this.sticky + 1;
 				}
 			}
 
-			// If the editor becomes sticky, increment the sticky index and adjust
-			// the targetIndex to be at the end of sticky editors unless already.
+			// 如果编辑器变为固定状态，增加固定索引并调整
+			// 目标索引到固定编辑器的末尾（如果尚未在末尾）
 			if (makeSticky) {
 				this.sticky++;
 
@@ -373,24 +371,24 @@ export class EditorGroupModel extends Disposable implements IEditorGroupModel {
 				}
 			}
 
-			// Insert into our list of editors if pinned or we have no preview editor
+			// 如果是固定编辑器或者我们没有预览编辑器，则插入到编辑器列表中
 			if (makePinned || !this.preview) {
 				this.splice(targetIndex, false, newEditor);
 			}
 
-			// Handle transient
+			// 处理临时状态
 			if (makeTransient) {
 				this.doSetTransient(newEditor, targetIndex, true);
 			}
 
-			// Handle preview
+			// 处理预览状态
 			if (!makePinned) {
 
-				// Replace existing preview with this editor if we have a preview
+				// 如果我们有预览编辑器，则用这个编辑器替换现有的预览
 				if (this.preview) {
 					const indexOfPreview = this.indexOf(this.preview);
 					if (targetIndex > indexOfPreview) {
-						targetIndex--; // accomodate for the fact that the preview editor closes
+						targetIndex--; // 考虑预览编辑器关闭的情况
 					}
 
 					this.replaceEditor(this.preview, newEditor, targetIndex, !makeActive);
@@ -399,10 +397,10 @@ export class EditorGroupModel extends Disposable implements IEditorGroupModel {
 				this.preview = newEditor;
 			}
 
-			// Listeners
+			// 监听器
 			this.registerEditorListeners(newEditor);
 
-			// Event
+			// 事件
 			const event: IGroupEditorOpenEvent = {
 				kind: GroupModelChangeKind.EDITOR_OPEN,
 				editor: newEditor,
@@ -456,7 +454,7 @@ export class EditorGroupModel extends Disposable implements IEditorGroupModel {
 		const listeners = new DisposableStore();
 		this.editorListeners.add(listeners);
 
-		// Re-emit disposal of editor input as our own event
+		// 将编辑器输入的处置重新发送为我们自己的事件
 		listeners.add(Event.once(editor.onWillDispose)(() => {
 			const editorIndex = this.editors.indexOf(editor);
 			if (editorIndex >= 0) {
@@ -469,7 +467,7 @@ export class EditorGroupModel extends Disposable implements IEditorGroupModel {
 			}
 		}));
 
-		// Re-Emit dirty state changes
+		// 重新发送脏状态变更
 		listeners.add(editor.onDidChangeDirty(() => {
 			const event: IGroupEditorChangeEvent = {
 				kind: GroupModelChangeKind.EDITOR_DIRTY,
@@ -479,7 +477,7 @@ export class EditorGroupModel extends Disposable implements IEditorGroupModel {
 			this._onDidModelChange.fire(event);
 		}));
 
-		// Re-Emit label changes
+		// 重新发送标签变更
 		listeners.add(editor.onDidChangeLabel(() => {
 			const event: IGroupEditorChangeEvent = {
 				kind: GroupModelChangeKind.EDITOR_LABEL,
@@ -489,7 +487,7 @@ export class EditorGroupModel extends Disposable implements IEditorGroupModel {
 			this._onDidModelChange.fire(event);
 		}));
 
-		// Re-Emit capability changes
+		// 重新发送能力变更
 		listeners.add(editor.onDidChangeCapabilities(() => {
 			const event: IGroupEditorChangeEvent = {
 				kind: GroupModelChangeKind.EDITOR_CAPABILITIES,
@@ -499,7 +497,7 @@ export class EditorGroupModel extends Disposable implements IEditorGroupModel {
 			this._onDidModelChange.fire(event);
 		}));
 
-		// Clean up dispose listeners once the editor gets closed
+		// 一旦编辑器关闭，清理处置监听器
 		listeners.add(this.onDidModelChange(event => {
 			if (event.kind === GroupModelChangeKind.EDITOR_CLOSE && event.editor?.matches(editor)) {
 				dispose(listeners);
@@ -511,9 +509,9 @@ export class EditorGroupModel extends Disposable implements IEditorGroupModel {
 	private replaceEditor(toReplace: EditorInput, replaceWith: EditorInput, replaceIndex: number, openNext = true): void {
 		const closeResult = this.doCloseEditor(toReplace, EditorCloseContext.REPLACE, openNext); // optimization to prevent multiple setActive() in one call
 
-		// We want to first add the new editor into our model before emitting the close event because
-		// firing the close event can trigger a dispose on the same editor that is now being added.
-		// This can lead into opening a disposed editor which is not what we want.
+		// 我们希望先将新编辑器添加到我们的模型中，然后再发送关闭事件，
+		// 因为发送关闭事件可能会触发对正在添加的同一个编辑器的处置。
+		// 这可能会导致打开一个已处置的编辑器，这不是我们想要的。
 		this.splice(replaceIndex, false, replaceWith);
 
 		if (closeResult) {
@@ -550,53 +548,53 @@ export class EditorGroupModel extends Disposable implements IEditorGroupModel {
 		const editor = this.editors[index];
 		const sticky = this.isSticky(index);
 
-		// Active editor closed
+		// 关闭活动编辑器
 		const isActiveEditor = this.active === editor;
 		if (openNext && isActiveEditor) {
 
-			// More than one editor
+			// 多于一个编辑器
 			if (this.mru.length > 1) {
 				let newActive: EditorInput;
 				if (this.focusRecentEditorAfterClose) {
-					newActive = this.mru[1]; // active editor is always first in MRU, so pick second editor after as new active
+					newActive = this.mru[1]; // 活动编辑器总是在 MRU 列表的首位，所以选择第二个编辑器作为新的活动编辑器
 				} else {
 					if (index === this.editors.length - 1) {
-						newActive = this.editors[index - 1]; // last editor is closed, pick previous as new active
+						newActive = this.editors[index - 1]; // 最后一个编辑器已关闭，选择前一个作为新的活动编辑器
 					} else {
-						newActive = this.editors[index + 1]; // pick next editor as new active
+						newActive = this.editors[index + 1]; // 选择下一个编辑器作为新的活动编辑器
 					}
 				}
 
-				// Select editor as active
+				// 选择编辑器为活动状态
 				const newInactiveSelectedEditors = this.selection.filter(selected => selected !== editor && selected !== newActive);
 				this.doSetSelection(newActive, this.editors.indexOf(newActive), newInactiveSelectedEditors);
 			}
 
-			// Last editor closed: clear selection
+			// 最后一个编辑器关闭：清除选择
 			else {
 				this.doSetSelection(null, undefined, []);
 			}
 		}
 
-		// Inactive editor closed
+		// 关闭非活动编辑器
 		else if (!isActiveEditor) {
 
-			// Remove editor from inactive selection
+			// 从非活动选择中移除编辑器
 			if (this.doIsSelected(editor)) {
 				const newInactiveSelectedEditors = this.selection.filter(selected => selected !== editor && selected !== this.activeEditor);
 				this.doSetSelection(this.activeEditor, this.indexOf(this.activeEditor), newInactiveSelectedEditors);
 			}
 		}
 
-		// Preview Editor closed
+		// 预览编辑器关闭
 		if (this.preview === editor) {
 			this.preview = null;
 		}
 
-		// Remove from transient
+		// 从临时集合中移除
 		this.transient.delete(editor);
 
-		// Remove from arrays
+		// 从数组中移除
 		this.splice(index, true);
 
 		// Event

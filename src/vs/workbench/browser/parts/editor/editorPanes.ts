@@ -330,7 +330,7 @@ export class EditorPanes extends Disposable {
 		// Hide active one first
 		this.doHideActiveEditorPane();
 
-		// Create editor pane
+		// 创建编辑器窗口
 		const editorPane = this.doCreateEditorPane(descriptor);
 
 		// Set editor as active
@@ -359,10 +359,10 @@ export class EditorPanes extends Disposable {
 
 	private doCreateEditorPane(descriptor: IEditorPaneDescriptor): EditorPane {
 
-		// Instantiate editor
+		// 实例化编辑器
 		const editorPane = this.doInstantiateEditorPane(descriptor);
 
-		// Create editor container as needed
+		// 创建编辑器容器
 		if (!editorPane.getContainer()) {
 			const editorPaneContainer = $('.editor-instance');
 
@@ -399,7 +399,7 @@ export class EditorPanes extends Disposable {
 			return existingEditorPane;
 		}
 
-		// Otherwise instantiate new
+		// 否则实例化新的
 		const editorPane = this._register(descriptor.instantiate(this.instantiationService, this.groupView));
 		this.editorPanes.push(editorPane);
 

@@ -559,7 +559,7 @@ class SizeUtils {
 }
 
 // ----------------------------------------------------------------------------------------
-// Position & Dimension
+// 位置 & 尺寸
 
 export interface IDimension {
 	readonly width: number;

@@ -94,6 +94,12 @@ export class EditorResolverService extends Disposable implements IEditorResolver
 		}
 	}
 
+	/**
+	 * 会根据文件类型和注册的编辑器贡献确定使用哪种编辑器：
+	 * 检查文件扩展名、MIME类型和其他因素
+	 * 对于常规文本文件，会选择默认的文本编辑器（Monaco编辑器）
+	 * 对于特殊文件类型（如图像），会选择对应的编辑器类型
+	 */
 	async resolveEditor(editor: IUntypedEditorInput, preferredGroup: PreferredGroup | undefined): Promise<ResolvedEditor> {
 		// Update the flattened editors
 		this._flattenedEditors = this._flattenEditorsMap();
